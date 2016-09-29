@@ -63,7 +63,7 @@ func (cl *Client) createRequest(method string, body io.Reader, pathFormat string
 
 // GetBucket describes the current state of a bucket
 func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse, error) {
-	req := cl.createRequest("GET", nil, pathToBucket, account, bucket, workspace)
+	req := cl.createRequest("GET", nil, pathToBucket, account, workspace, bucket)
 	res, reserr := hcli.Do(req)
 	if reserr != nil {
 		return nil, reserr
