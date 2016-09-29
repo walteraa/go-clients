@@ -51,7 +51,7 @@ func (cl *Client) createRequestB(method string, content []byte, pathFormat strin
 }
 
 func (cl *Client) createRequest(method string, body io.Reader, pathFormat string, a ...interface{}) *http.Request {
-	req, err := http.NewRequest("GET", fmt.Sprintf(cl.Endpoint+pathFormat, a...), body)
+	req, err := http.NewRequest(method, fmt.Sprintf(cl.Endpoint+pathFormat, a...), body)
 	if err != nil {
 		panic(err)
 	}

@@ -47,7 +47,7 @@ func (cl *Client) createRequest(method string, content []byte, pathFormat string
 	if content != nil {
 		body = bytes.NewBuffer(content)
 	}
-	req, _ := http.NewRequest("GET", fmt.Sprintf(cl.Endpoint+pathFormat, a...), body)
+	req, _ := http.NewRequest(method, fmt.Sprintf(cl.Endpoint+pathFormat, a...), body)
 	req.Header.Set("Authorization", "token "+cl.AuthToken)
 	req.Header.Set("User-Agent", cl.UserAgent)
 	return req
