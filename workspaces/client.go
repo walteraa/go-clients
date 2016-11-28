@@ -25,7 +25,7 @@ type Workspaces interface {
 	GetFile(account, workspace, bucket, path string) (io.ReadCloser, error)
 	GetFileB(account, workspace, bucket, path string) ([]byte, error)
 	SaveFile(account, workspace, bucket, path string, body io.Reader) error
-	SaveFileB(account, workspace, bucket, path string, content []byte, unzip bool) error
+	SaveFileB(account, workspace, bucket, path string, content []byte, contentType string, unzip bool) error
 	ListFiles(account, workspace, bucket, prefix, marker string, size int) (*FileListResponse, error)
 	ListAllFiles(account, workspace, bucket, prefix string, size int) (*FileListResponse, error)
 }
@@ -144,8 +144,10 @@ func (cl *Client) SaveFile(account, workspace, bucket, path string, body io.Read
 }
 
 // SaveFileB saves a file to a workspace
-func (cl *Client) SaveFileB(account, workspace, bucket, path string, body []byte, unzip bool) error {
+func (cl *Client) SaveFileB(account, workspace, bucket, path string, body []byte, contentType string, unzip bool) error {
 	req := cl.createRequestB("PUT", body, pathToFile, account, workspace, bucket, path, unzip)
+	req.Header.Set("Content-Type", contentType)
+
 	res, reserr := hcli.Do(req)
 	if reserr != nil {
 		return reserr
