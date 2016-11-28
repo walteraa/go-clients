@@ -43,10 +43,16 @@ func NewClient(endpoint, authToken, userAgent string) Workspaces {
 }
 
 const (
+<<<<<<< HEAD
 	pathToBucket      = "%v/%v/buckets/%v"
 	pathToBucketState = "%v/%v/buckets/%v/state"
 	pathToFile        = "%v/%v/buckets/%v/files/%v?unzip=%t"
-	pathToFileList    = "%v/%v/buckets/%v/files?prefix=%v&marker=%v&size=%d"
+=======
+	pathToGetBucket = "%v/%v/buckets/%v"
+	pathToSetBucket = "%v/%v/buckets/%v/state"
+	pathToFile      = "%v/%v/buckets/%v/files/%v?unzip=%t"
+	pathToFileList  = "%v/%v/buckets/%v/files?prefix=%v&marker=%v&size=%d"
+>>>>>>> 568b7e4... Adds func to list files
 )
 
 func (cl *Client) createRequestB(method string, content []byte, pathFormat string, a ...interface{}) *http.Request {
