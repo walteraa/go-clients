@@ -22,7 +22,7 @@ type Workspaces interface {
 	GetFile(account, workspace, bucket, path string) (io.ReadCloser, error)
 	GetFileB(account, workspace, bucket, path string) ([]byte, error)
 	SaveFile(account, workspace, bucket, path string, body io.Reader) error
-	SaveFileB(account, workspace, bucket, path string, content []byte) error
+	SaveFileB(account, workspace, bucket, path string, content []byte, unzip bool) error
 }
 
 // Client is a struct that provides interaction with workspaces
@@ -39,7 +39,7 @@ func NewClient(endpoint, authToken, userAgent string) Workspaces {
 
 const (
 	pathToBucket = "%v/%v/buckets/%v"
-	pathToFile   = "%v/%v/buckets/%v/files/%v"
+	pathToFile   = "%v/%v/buckets/%v/files/%v?unzip=%t"
 )
 
 func (cl *Client) createRequestB(method string, content []byte, pathFormat string, a ...interface{}) *http.Request {
@@ -123,8 +123,8 @@ func (cl *Client) SaveFile(account, workspace, bucket, path string, body io.Read
 }
 
 // SaveFileB saves a file to a workspace
-func (cl *Client) SaveFileB(account, workspace, bucket, path string, body []byte) error {
-	req := cl.createRequestB("PUT", body, pathToFile, account, workspace, bucket, path)
+func (cl *Client) SaveFileB(account, workspace, bucket, path string, body []byte, unzip bool) error {
+	req := cl.createRequestB("PUT", body, pathToFile, account, workspace, bucket, path, unzip)
 	res, reserr := hcli.Do(req)
 	if reserr != nil {
 		return reserr
