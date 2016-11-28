@@ -28,6 +28,7 @@ type Workspaces interface {
 	SaveFileB(account, workspace, bucket, path string, content []byte, contentType string, unzip bool) error
 	ListFiles(account, workspace, bucket, prefix, marker string, size int) (*FileListResponse, error)
 	ListAllFiles(account, workspace, bucket, prefix string, size int) (*FileListResponse, error)
+	DeleteFile(account, workspace, bucket, path string) error
 }
 
 // Client is a struct that provides interaction with workspaces
@@ -209,4 +210,18 @@ func (cl *Client) ListAllFiles(account, workspace, bucket, prefix string, size i
 	}
 
 	return partialList, nil
+}
+
+// DeleteFile deletes a file from the workspace
+func (cl *Client) DeleteFile(account, workspace, bucket, path string) error {
+	req := cl.createRequest("DELETE", nil, pathToFile, account, workspace, bucket, path, false)
+	res, reserr := hcli.Do(req)
+	if reserr != nil {
+		return reserr
+	}
+	if err := errors.StatusCode(res); err != nil {
+		return err
+	}
+
+	return nil
 }
