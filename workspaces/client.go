@@ -105,7 +105,7 @@ func (cl *Client) SetBucketState(account, workspace, bucket, state string) error
 
 // GetFile gets a file's content as a read closer
 func (cl *Client) GetFile(account, workspace, bucket, path string) (io.ReadCloser, error) {
-	req := cl.createRequest("GET", nil, pathToFile, account, workspace, bucket, path)
+	req := cl.createRequest("GET", nil, pathToFile, account, workspace, bucket, path, false)
 	res, reserr := hcli.Do(req)
 	if reserr != nil {
 		return nil, reserr
@@ -133,7 +133,7 @@ func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, err
 
 // SaveFile saves a file to a workspace
 func (cl *Client) SaveFile(account, workspace, bucket, path string, body io.Reader) error {
-	req := cl.createRequest("PUT", body, pathToFile, account, workspace, bucket, path)
+	req := cl.createRequest("PUT", body, pathToFile, account, workspace, bucket, path, false)
 	res, reserr := hcli.Do(req)
 	if reserr != nil {
 		return reserr
