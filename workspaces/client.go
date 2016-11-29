@@ -167,7 +167,7 @@ func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, s
 	prefix = url.QueryEscape(prefix)
 	marker = url.QueryEscape(marker)
 
-	req := cl.createRequest("GET", nil, pathToFile, account, workspace, bucket, prefix, marker, size)
+	req := cl.createRequest("GET", nil, pathToFileList, account, workspace, bucket, prefix, marker, size)
 	res, reserr := hcli.Do(req)
 	if reserr != nil {
 		return nil, reserr
