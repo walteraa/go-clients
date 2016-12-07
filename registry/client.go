@@ -22,6 +22,7 @@ var hcli = &http.Client{
 type Registry interface {
 	GetAppMetadata(account string, id appidentifier.ComposedIdentifier) (*metadata.AppMetadata, error)
 	ListIdentities(account string, id appidentifier.ComposedIdentifier, acceptRange bool) (*IdentityListResponse, error)
+	ListAppFiles(account string, id appidentifier.ComposedIdentifier) (*FileListResponse, error)
 }
 
 // Client is a struct that provides interaction with apps
@@ -39,6 +40,7 @@ func NewClient(endpoint, authToken, userAgent string) Registry {
 const (
 	pathToAppMetadata = "/%v/master/registry/%v/%v"
 	pathToAppIdentity = "/%v/master/registry/%v/%v/identity?acceptRange=%t"
+	pathToAppFileList = "/%v/master/registry/%v/%v/files"
 )
 
 func (cl *Client) createRequest(method string, content []byte, pathFormat string, a ...interface{}) *http.Request {
@@ -88,6 +90,30 @@ func (cl *Client) ListIdentities(account string, id appidentifier.ComposedIdenti
 	}
 
 	var l IdentityListResponse
+	buf, buferr := ioutil.ReadAll(res.Body)
+	if buferr != nil {
+		return nil, buferr
+	}
+
+	jsonerr := json.Unmarshal(buf, &l)
+	if jsonerr != nil {
+		return nil, jsonerr
+	}
+
+	return &l, nil
+}
+
+func (cl *Client) ListAppFiles(account string, id appidentifier.ComposedIdentifier) (*FileListResponse, error) {
+	req := cl.createRequest("GET", nil, pathToAppFileList, account, id.Prefix(), id.Suffix())
+	res, reserr := hcli.Do(req)
+	if reserr != nil {
+		return nil, reserr
+	}
+	if err := errors.StatusCode(res); err != nil {
+		return nil, err
+	}
+
+	var l FileListResponse
 	buf, buferr := ioutil.ReadAll(res.Body)
 	if buferr != nil {
 		return nil, buferr

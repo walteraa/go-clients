@@ -10,3 +10,13 @@ type IdentityListResponseEntry struct {
 type IdentityListResponse struct {
 	Identities []*IdentityListResponseEntry `json:"identities"`
 }
+
+type FileListResponseEntry struct {
+	Path     string `json:"file"`
+	Hash     string `json:"hash"`
+	Location string `json:"location"`
+}
+
+type FileListResponse struct {
+	Files []*FileListResponseEntry `json:"files"`
+}
