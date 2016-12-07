@@ -23,6 +23,7 @@ type Registry interface {
 	GetAppMetadata(account string, id appidentifier.ComposedIdentifier) (*metadata.AppMetadata, error)
 	ListIdentities(account string, id appidentifier.ComposedIdentifier, acceptRange bool) (*IdentityListResponse, error)
 	ListAppFiles(account string, id appidentifier.ComposedIdentifier) (*FileListResponse, error)
+	GetAppFileB(account string, id appidentifier.ComposedIdentifier, path string) ([]byte, error)
 }
 
 // Client is a struct that provides interaction with apps
@@ -38,9 +39,10 @@ func NewClient(endpoint, authToken, userAgent string) Registry {
 }
 
 const (
-	pathToAppMetadata = "/%v/master/registry/%v/%v"
-	pathToAppIdentity = "/%v/master/registry/%v/%v/identity?acceptRange=%t"
-	pathToAppFileList = "/%v/master/registry/%v/%v/files"
+	pathToAppMetadata    = "/%v/master/registry/%v/%v"
+	pathToAppIdentity    = "/%v/master/registry/%v/%v/identity?acceptRange=%t"
+	pathToAppFileList    = "/%v/master/registry/%v/%v/files"
+	pathToAppFileContent = "/%v/master/registry/%v/%v/files/%v"
 )
 
 func (cl *Client) createRequest(method string, content []byte, pathFormat string, a ...interface{}) *http.Request {
@@ -125,4 +127,22 @@ func (cl *Client) ListAppFiles(account string, id appidentifier.ComposedIdentifi
 	}
 
 	return &l, nil
+}
+
+func (cl *Client) GetAppFileB(account string, id appidentifier.ComposedIdentifier, path string) ([]byte, error) {
+	req := cl.createRequest("GET", nil, pathToAppFileContent, account, id.Prefix(), id.Suffix(), path)
+	res, reserr := hcli.Do(req)
+	if reserr != nil {
+		return nil, reserr
+	}
+	if err := errors.StatusCode(res); err != nil {
+		return nil, err
+	}
+
+	buf, buferr := ioutil.ReadAll(res.Body)
+	if buferr != nil {
+		return nil, buferr
+	}
+
+	return buf, nil
 }
