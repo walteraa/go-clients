@@ -17,3 +17,15 @@ type FileListResponse struct {
 	Files      []*FileListEntryResponse `json:"files"`
 	NextMarker string                   `json:"nextMarker"`
 }
+
+// Conflict a 409 response's payload
+type Conflict struct {
+	Base   *ConflictEntry `json:"base"`
+	Other  *ConflictEntry `json:"other"`
+	Master *ConflictEntry `json:"master"`
+}
+
+// ConflictEntry is a Conflict's item
+type ConflictEntry struct {
+	Content string `json:"content"`
+}

@@ -24,6 +24,8 @@ type Workspaces interface {
 	SetBucketState(account, workspace, bucket, state string) error
 	GetFile(account, workspace, bucket, path string) (io.ReadCloser, error)
 	GetFileB(account, workspace, bucket, path string) ([]byte, error)
+	GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, error)
+	GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, error)
 	SaveFile(account, workspace, bucket, path string, body io.Reader) error
 	SaveFileB(account, workspace, bucket, path string, content []byte, contentType string, unzip bool) error
 	ListFiles(account, workspace, bucket, prefix, marker string, size int) (*FileListResponse, error)
@@ -89,7 +91,7 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 	return &bucketResponse, nil
 }
 
-// SetBucket sets the current state of a bucket
+// SetBucketState sets the current state of a bucket
 func (cl *Client) SetBucketState(account, workspace, bucket, state string) error {
 	req := cl.createRequest("PUT", bytes.NewBufferString(state), pathToBucketState, account, workspace, bucket)
 	res, reserr := hcli.Do(req)
@@ -129,6 +131,52 @@ func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, err
 		return nil, buferr
 	}
 	return buf, nil
+}
+
+// GetFileConflict gets a file's content as a byte slice, or conflict
+func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, error) {
+	req := cl.createRequest("GET", nil, pathToFile, account, workspace, bucket, path, false)
+	req.Header.Add("x-conflict-resolution", "merge")
+
+	res, reserr := hcli.Do(req)
+	if reserr != nil {
+		return nil, nil, reserr
+	}
+
+	if res.StatusCode == 409 {
+		buf, buferr := ioutil.ReadAll(res.Body)
+		if buferr != nil {
+			return nil, nil, buferr
+		}
+		var conflict Conflict
+		uerr := json.Unmarshal(buf, &conflict)
+		if uerr != nil {
+			return nil, nil, uerr
+		}
+		return nil, &conflict, nil
+	}
+	if err := errors.StatusCode(res); err != nil {
+		return nil, nil, err
+	}
+
+	return res.Body, nil, nil
+}
+
+// GetFileConflictB gets a file's content as bytes or conflict
+func (cl *Client) GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, error) {
+	body, conflict, err := cl.GetFileConflict(account, workspace, bucket, path)
+	if err != nil {
+		return nil, nil, err
+	}
+	if conflict != nil {
+		return nil, conflict, nil
+	}
+
+	buf, buferr := ioutil.ReadAll(body)
+	if buferr != nil {
+		return nil, nil, buferr
+	}
+	return buf, nil, nil
 }
 
 // SaveFile saves a file to a workspace
