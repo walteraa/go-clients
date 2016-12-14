@@ -21,7 +21,7 @@ type FileListResponse struct {
 // Conflict a 409 response's payload
 type Conflict struct {
 	Base   *ConflictEntry `json:"base"`
-	Other  *ConflictEntry `json:"other"`
+	Mine   *ConflictEntry `json:"mine"`
 	Master *ConflictEntry `json:"master"`
 }
 
