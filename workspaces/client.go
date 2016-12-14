@@ -94,6 +94,8 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 // SetBucketState sets the current state of a bucket
 func (cl *Client) SetBucketState(account, workspace, bucket, state string) error {
 	req := cl.createRequest("PUT", bytes.NewBufferString(state), pathToBucketState, account, workspace, bucket)
+	req.Header.Add("Content-Type", "application/json")
+
 	res, reserr := hcli.Do(req)
 	if reserr != nil {
 		return reserr
