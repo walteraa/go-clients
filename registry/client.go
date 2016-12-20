@@ -39,10 +39,10 @@ func NewClient(endpoint, authToken, userAgent string) Registry {
 }
 
 const (
-	pathToAppMetadata    = "/%v/master/registry/%v/%v"
-	pathToAppIdentity    = "/%v/master/registry/%v/%v/identity?acceptRange=%t"
-	pathToAppFileList    = "/%v/master/registry/%v/%v/files"
-	pathToAppFileContent = "/%v/master/registry/%v/%v/files/%v"
+	pathToAppMetadata    = "%v/master/registry/%v/%v"
+	pathToAppIdentity    = "%v/master/registry/%v/%v/identity?acceptRange=%t"
+	pathToAppFileList    = "%v/master/registry/%v/%v/files"
+	pathToAppFileContent = "%v/master/registry/%v/%v/files/%v"
 )
 
 func (cl *Client) createRequest(method string, content []byte, pathFormat string, a ...interface{}) *http.Request {
