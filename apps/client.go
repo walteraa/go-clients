@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/vtex/go-clients/utils"
+	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 )
 
@@ -24,7 +24,7 @@ type Client struct {
 
 // NewClient creates a new Apps client
 func NewClient(endpoint, authToken, userAgent string) Apps {
-	return &Client{utils.CreateClient(endpoint, authToken, userAgent)}
+	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
 }
 
 const (

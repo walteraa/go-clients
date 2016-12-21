@@ -1,4 +1,4 @@
-package errors
+package clients
 
 type ErrorDescriptor struct {
 	Code    string `json:"code"`

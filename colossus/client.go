@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/vtex/go-clients/utils"
+	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 )
 
@@ -18,7 +18,7 @@ type Client struct {
 }
 
 func NewClient(endpoint, authToken, userAgent string) Colossus {
-	return &Client{utils.CreateClient(endpoint, authToken, userAgent)}
+	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
 }
 
 const (

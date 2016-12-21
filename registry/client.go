@@ -5,7 +5,7 @@ import (
 
 	"github.com/vtex/apps-utils/appidentifier"
 	"github.com/vtex/apps-utils/metadata"
-	"github.com/vtex/go-clients/utils"
+	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 )
 
@@ -24,7 +24,7 @@ type Client struct {
 
 // NewClient creates a new Registry client
 func NewClient(endpoint, authToken, userAgent string) Registry {
-	return &Client{utils.CreateClient(endpoint, authToken, userAgent)}
+	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
 }
 
 const (

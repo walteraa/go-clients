@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/vtex/go-clients/errors"
-	"github.com/vtex/go-clients/utils"
+	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
 )
@@ -33,7 +32,7 @@ type Client struct {
 
 // NewClient creates a new Workspaces client
 func NewClient(endpoint, authToken, userAgent string) Workspaces {
-	return &Client{utils.CreateClient(endpoint, authToken, userAgent)}
+	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
 }
 
 const (
@@ -99,7 +98,7 @@ func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.R
 		Use(headers.Set("x-conflict-resolution", "merge")).Send()
 
 	if err != nil {
-		if err, ok := err.(errors.StatusCodeError); ok && err.StatusCode == 409 {
+		if err, ok := err.(clients.StatusCodeError); ok && err.Response.StatusCode == 409 {
 			var conflict Conflict
 			if err := res.JSON(&conflict); err != nil {
 				return nil, nil, err
