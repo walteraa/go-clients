@@ -1,4 +1,4 @@
-package workspaces
+package vbase
 
 // BucketResponse is the description of a bucket's state
 type BucketResponse struct {

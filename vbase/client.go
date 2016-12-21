@@ -1,4 +1,4 @@
-package workspaces
+package vbase
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 )
 
 // Workspaces is an interface for interacting with workspaces
-type Workspaces interface {
+type VBase interface {
 	GetBucket(account, workspace, bucket string) (*BucketResponse, error)
 	SetBucketState(account, workspace, bucket, state string) error
 	GetFile(account, workspace, bucket, path string) (io.ReadCloser, error)
@@ -31,7 +31,7 @@ type Client struct {
 }
 
 // NewClient creates a new Workspaces client
-func NewClient(endpoint, authToken, userAgent string) Workspaces {
+func NewClient(endpoint, authToken, userAgent string) VBase {
 	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
 }
 
