@@ -98,7 +98,7 @@ func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.R
 		Use(headers.Set("x-conflict-resolution", "merge")).Send()
 
 	if err != nil {
-		if err, ok := err.(clients.StatusCodeError); ok && err.Response.StatusCode == 409 {
+		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == 409 {
 			var conflict Conflict
 			if err := res.JSON(&conflict); err != nil {
 				return nil, nil, err

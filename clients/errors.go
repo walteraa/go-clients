@@ -5,12 +5,13 @@ import (
 	"net/http"
 )
 
-type StatusCodeError struct {
-	Response *http.Response
-	Code     string
-	Message  string
+type ResponseError struct {
+	Response   *http.Response
+	StatusCode int
+	Code       string
+	Message    string
 }
 
-func (err StatusCodeError) Error() string {
-	return fmt.Sprintf("(%d %v at %v) %v", err.Response.StatusCode, err.Code, err.Response.Request.URL, err.Message)
+func (err ResponseError) Error() string {
+	return fmt.Sprintf("(%d %v at %v) %v", err.StatusCode, err.Code, err.Response.Request.URL, err.Message)
 }

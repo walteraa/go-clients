@@ -37,10 +37,11 @@ func statusCode(res *http.Response) error {
 
 	descr := parse(res)
 
-	return StatusCodeError{
-		Response: res,
-		Code:     descr.Code,
-		Message:  descr.Message,
+	return ResponseError{
+		Response:   res,
+		StatusCode: res.StatusCode,
+		Code:       descr.Code,
+		Message:    descr.Message,
 	}
 }
 
