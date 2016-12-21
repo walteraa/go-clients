@@ -12,9 +12,21 @@ type DependencyTree map[string]DependencyTree
 
 // Manifest is an installed app's manifest
 type Manifest struct {
-	ID           string         `json:"id"`
-	Vendor       string         `json:"vendor"`
-	Name         string         `json:"name"`
-	Version      string         `json:"version"`
-	Dependencies DependencyTree `json:"dependencyTree"`
+	Registry       string            `json:"registry"`
+	ID             string            `json:"id"`
+	Vendor         string            `json:"vendor"`
+	Name           string            `json:"name"`
+	Version        string            `json:"version"`
+	Dependencies   map[string]string `json:"dependencies"`
+	DependencyTree DependencyTree    `json:"dependencyTree"`
+	Linked         bool              `json:"link"`
+}
+
+type FileList struct {
+	Files []*File `json:"data"`
+}
+
+type File struct {
+	Path string `json:"file"`
+	Hash string `json:"hash"`
 }

@@ -1,5 +1,13 @@
 package registry
 
+type Manifest struct {
+	ID           string            `json:"id"`
+	Vendor       string            `json:"vendor"`
+	Name         string            `json:"name"`
+	Version      string            `json:"version"`
+	Dependencies map[string]string `json:"dependencies"`
+}
+
 type IdentityListResponseEntry struct {
 	Vendor   string `json:"vendor"`
 	Name     string `json:"name"`
@@ -11,12 +19,12 @@ type IdentityListResponse struct {
 	Identities []*IdentityListResponseEntry `json:"identities"`
 }
 
-type FileListResponseEntry struct {
+type File struct {
 	Path     string `json:"file"`
 	Hash     string `json:"hash"`
 	Location string `json:"location"`
 }
 
-type FileListResponse struct {
-	Files []*FileListResponseEntry `json:"files"`
+type FileList struct {
+	Files []*File `json:"data"`
 }

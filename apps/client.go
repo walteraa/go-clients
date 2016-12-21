@@ -12,6 +12,7 @@ import (
 // Apps is an interface for interacting with apps
 type Apps interface {
 	GetApp(account, workspace, app string, context []string) (*Manifest, error)
+	ListFiles(account, workspace, app string, context []string) (*FileList, error)
 	GetFile(account, workspace, app string, context []string, path string) (io.ReadCloser, error)
 	GetFileB(account, workspace, app string, context []string, path string) ([]byte, error)
 	GetFileJ(account, workspace, app string, context []string, path string, dest interface{}) error
@@ -28,8 +29,9 @@ func NewClient(endpoint, authToken, userAgent string) Apps {
 }
 
 const (
-	pathToApp  = "/%v/%v/apps/%v"
-	pathToFile = "/%v/%v/apps/%v/files/%v"
+	pathToApp   = "/%v/%v/apps/%v"
+	pathToFiles = "/%v/%v/apps/%v/files"
+	pathToFile  = "/%v/%v/apps/%v/files/%v"
 )
 
 // GetApp describes an installed app's manifest
@@ -46,6 +48,20 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 	}
 
 	return &manifest, nil
+}
+
+func (cl *Client) ListFiles(account, workspace, app string, context []string) (*FileList, error) {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, account, workspace, app)).
+		SetQuery("context", strings.Join(context, "/")).Send()
+	if err != nil {
+		return nil, err
+	}
+
+	var files FileList
+	if err := res.JSON(&files); err != nil {
+		return nil, err
+	}
+	return &files, nil
 }
 
 // GetFile gets an installed app's file as read closer
