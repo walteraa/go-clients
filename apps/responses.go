@@ -19,7 +19,7 @@ type Manifest struct {
 	Version        string            `json:"version"`
 	Dependencies   map[string]string `json:"dependencies"`
 	DependencyTree DependencyTree    `json:"dependencyTree"`
-	Linked         bool              `json:"link"`
+	Link           string            `json:"link"`
 }
 
 type FileList struct {
