@@ -1,21 +1,13 @@
 package apps
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
 	"strings"
-	"time"
 
-	"github.com/vtex/go-clients/errors"
+	"github.com/vtex/go-clients/utils"
+	"gopkg.in/h2non/gentleman.v1"
 )
-
-var hcli = &http.Client{
-	Timeout: time.Second * 10,
-}
 
 // Apps is an interface for interacting with apps
 type Apps interface {
@@ -27,52 +19,30 @@ type Apps interface {
 
 // Client is a struct that provides interaction with apps
 type Client struct {
-	Endpoint  string
-	AuthToken string
-	UserAgent string
+	http *gentleman.Client
 }
 
 // NewClient creates a new Apps client
 func NewClient(endpoint, authToken, userAgent string) Apps {
-	return &Client{Endpoint: endpoint, AuthToken: authToken, UserAgent: userAgent}
+	return &Client{utils.CreateClient(endpoint, authToken, userAgent)}
 }
 
 const (
-	pathToApp  = "/%v/%v/apps/%v?context=%v"
-	pathToFile = "/%v/%v/apps/%v/files/%v?context=%v"
+	pathToApp  = "/%v/%v/apps/%v"
+	pathToFile = "/%v/%v/apps/%v/files/%v"
 )
-
-func (cl *Client) createRequest(method string, content []byte, pathFormat string, a ...interface{}) *http.Request {
-	var body io.Reader
-	if content != nil {
-		body = bytes.NewBuffer(content)
-	}
-	req, _ := http.NewRequest(method, fmt.Sprintf(cl.Endpoint+pathFormat, a...), body)
-	req.Header.Set("Authorization", "token "+cl.AuthToken)
-	req.Header.Set("User-Agent", cl.UserAgent)
-	return req
-}
 
 // GetApp describes an installed app's manifest
 func (cl *Client) GetApp(account, workspace, app string, context []string) (*Manifest, error) {
-	req := cl.createRequest("GET", nil, pathToApp, account, workspace, app, strings.Join(context, "/"))
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, account, workspace, app)).
+		SetQuery("context", strings.Join(context, "/")).Send()
+	if err != nil {
 		return nil, err
 	}
 
 	var manifest Manifest
-	buf, buferr := ioutil.ReadAll(res.Body)
-	if buferr != nil {
-		return nil, buferr
-	}
-
-	jsonerr := json.Unmarshal(buf, &manifest)
-	if jsonerr != nil {
-		return nil, jsonerr
+	if err := res.JSON(&manifest); err != nil {
+		return nil, err
 	}
 
 	return &manifest, nil
@@ -80,41 +50,34 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 
 // GetFile gets an installed app's file as read closer
 func (cl *Client) GetFile(account, workspace, app string, context []string, path string) (io.ReadCloser, error) {
-	req := cl.createRequest("GET", nil, pathToFile, account, workspace, app, path, strings.Join(context, "/"))
-	res, resErr := hcli.Do(req)
-	if resErr != nil {
-		return nil, resErr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, account, workspace, app, path)).
+		SetQuery("context", strings.Join(context, "/")).Send()
+	if err != nil {
 		return nil, err
 	}
-	return res.Body, nil
+
+	return res, nil
 }
 
 // GetFileB gets an installed app's file as bytes
 func (cl *Client) GetFileB(account, workspace, app string, context []string, path string) ([]byte, error) {
-	file, err := cl.GetFile(account, workspace, app, context, path)
+	res, err := cl.GetFile(account, workspace, app, context, path)
 	if err != nil {
 		return nil, err
 	}
 
-	buf, bufErr := ioutil.ReadAll(file)
-	if bufErr != nil {
-		return nil, bufErr
-	}
-	return buf, nil
+	return res.(*gentleman.Response).Bytes(), nil
 }
 
 // GetFileJ gets an installed app's file as deserialized JSON object
 func (cl *Client) GetFileJ(account, workspace, app string, context []string, path string, dest interface{}) error {
-	buf, err := cl.GetFileB(account, workspace, app, context, path)
+	res, err := cl.GetFile(account, workspace, app, context, path)
 	if err != nil {
 		return err
 	}
 
-	jsonErr := json.Unmarshal(buf, &dest)
-	if jsonErr != nil {
-		return jsonErr
+	if err := res.(*gentleman.Response).JSON(&dest); err != nil {
+		return err
 	}
 
 	return nil

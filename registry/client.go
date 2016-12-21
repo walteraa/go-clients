@@ -1,22 +1,13 @@
 package registry
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"time"
 
 	"github.com/vtex/apps-utils/appidentifier"
 	"github.com/vtex/apps-utils/metadata"
-	"github.com/vtex/go-clients/errors"
+	"github.com/vtex/go-clients/utils"
+	"gopkg.in/h2non/gentleman.v1"
 )
-
-var hcli = &http.Client{
-	Timeout: time.Second * 10,
-}
 
 // Registry is an interface for interacting with the registry
 type Registry interface {
@@ -28,121 +19,77 @@ type Registry interface {
 
 // Client is a struct that provides interaction with apps
 type Client struct {
-	Endpoint  string
-	AuthToken string
-	UserAgent string
+	http *gentleman.Client
 }
 
 // NewClient creates a new Registry client
 func NewClient(endpoint, authToken, userAgent string) Registry {
-	return &Client{Endpoint: endpoint, AuthToken: authToken, UserAgent: userAgent}
+	return &Client{utils.CreateClient(endpoint, authToken, userAgent)}
 }
 
 const (
-	pathToAppMetadata    = "%v/master/registry/%v/%v"
-	pathToAppIdentity    = "%v/master/registry/%v/%v/identity?acceptRange=%t"
-	pathToAppFileList    = "%v/master/registry/%v/%v/files"
-	pathToAppFileContent = "%v/master/registry/%v/%v/files/%v"
+	metadataPath    = "/%v/master/registry/%v/%v"
+	identityPath    = "/%v/master/registry/%v/%v/identity"
+	fileListPath    = "/%v/master/registry/%v/%v/files"
+	fileContentPath = "/%v/master/registry/%v/%v/files/%v"
 )
-
-func (cl *Client) createRequest(method string, content []byte, pathFormat string, a ...interface{}) *http.Request {
-	var body io.Reader
-	if content != nil {
-		body = bytes.NewBuffer(content)
-	}
-	req, _ := http.NewRequest(method, fmt.Sprintf(cl.Endpoint+pathFormat, a...), body)
-	req.Header.Set("Authorization", "token "+cl.AuthToken)
-	req.Header.Set("User-Agent", cl.UserAgent)
-	return req
-}
 
 // GetAppMetadata returns the app metadata
 func (cl *Client) GetAppMetadata(account string, id appidentifier.ComposedIdentifier) (*metadata.AppMetadata, error) {
-	req := cl.createRequest("GET", nil, pathToAppMetadata, account, id.Prefix(), id.Suffix())
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(metadataPath, account, id.Prefix(), id.Suffix())).Send()
+	if err != nil {
 		return nil, err
 	}
 
 	var m metadata.AppMetadata
-	buf, buferr := ioutil.ReadAll(res.Body)
-	if buferr != nil {
-		return nil, buferr
-	}
-
-	jsonerr := json.Unmarshal(buf, &m)
-	if jsonerr != nil {
-		return nil, jsonerr
+	if err := res.JSON(m); err != nil {
+		return nil, err
 	}
 
 	return &m, nil
 }
 
 func (cl *Client) ListIdentities(account string, id appidentifier.ComposedIdentifier, acceptRange bool) (*IdentityListResponse, error) {
-	req := cl.createRequest("GET", nil, pathToAppIdentity, account, id.Prefix(), id.Suffix(), acceptRange)
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, reserr
+	req := cl.http.Get().
+		AddPath(fmt.Sprintf(identityPath, account, id.Prefix(), id.Suffix()))
+	if acceptRange {
+		req = req.SetQuery("acceptRange", "true")
 	}
-	if err := errors.StatusCode(res); err != nil {
+	res, err := req.Send()
+	if err != nil {
 		return nil, err
 	}
 
 	var l IdentityListResponse
-	buf, buferr := ioutil.ReadAll(res.Body)
-	if buferr != nil {
-		return nil, buferr
-	}
-
-	jsonerr := json.Unmarshal(buf, &l)
-	if jsonerr != nil {
-		return nil, jsonerr
+	if err := res.JSON(&l); err != nil {
+		return nil, err
 	}
 
 	return &l, nil
 }
 
 func (cl *Client) ListAppFiles(account string, id appidentifier.ComposedIdentifier) (*FileListResponse, error) {
-	req := cl.createRequest("GET", nil, pathToAppFileList, account, id.Prefix(), id.Suffix())
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(fileListPath, account, id.Prefix(), id.Suffix())).Send()
+	if err != nil {
 		return nil, err
 	}
 
 	var l FileListResponse
-	buf, buferr := ioutil.ReadAll(res.Body)
-	if buferr != nil {
-		return nil, buferr
-	}
-
-	jsonerr := json.Unmarshal(buf, &l)
-	if jsonerr != nil {
-		return nil, jsonerr
+	if err := res.JSON(&l); err != nil {
+		return nil, err
 	}
 
 	return &l, nil
 }
 
 func (cl *Client) GetAppFileB(account string, id appidentifier.ComposedIdentifier, path string) ([]byte, error) {
-	req := cl.createRequest("GET", nil, pathToAppFileContent, account, id.Prefix(), id.Suffix(), path)
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(fileContentPath, account, id.Prefix(), id.Suffix(), path)).Send()
+	if err != nil {
 		return nil, err
 	}
 
-	buf, buferr := ioutil.ReadAll(res.Body)
-	if buferr != nil {
-		return nil, buferr
-	}
-
-	return buf, nil
+	return res.Bytes(), nil
 }

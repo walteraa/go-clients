@@ -2,21 +2,14 @@ package workspaces
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
-	"time"
-
-	"net/url"
 
 	"github.com/vtex/go-clients/errors"
+	"github.com/vtex/go-clients/utils"
+	"gopkg.in/h2non/gentleman.v1"
+	"gopkg.in/h2non/gentleman.v1/plugins/headers"
 )
-
-var hcli = &http.Client{
-	Timeout: time.Second * 10,
-}
 
 // Workspaces is an interface for interacting with workspaces
 type Workspaces interface {
@@ -35,72 +28,43 @@ type Workspaces interface {
 
 // Client is a struct that provides interaction with workspaces
 type Client struct {
-	Endpoint  string
-	AuthToken string
-	UserAgent string
+	http *gentleman.Client
 }
 
 // NewClient creates a new Workspaces client
 func NewClient(endpoint, authToken, userAgent string) Workspaces {
-	return &Client{Endpoint: endpoint, AuthToken: authToken, UserAgent: userAgent}
+	return &Client{utils.CreateClient(endpoint, authToken, userAgent)}
 }
 
 const (
-	pathToBucket      = "%v/%v/buckets/%v"
-	pathToBucketState = "%v/%v/buckets/%v/state"
-	pathToFile        = "%v/%v/buckets/%v/files/%v?unzip=%t"
-	pathToFileList    = "%v/%v/buckets/%v/files?prefix=%v&marker=%v&size=%d"
+	pathToBucket      = "/%v/%v/buckets/%v"
+	pathToBucketState = "/%v/%v/buckets/%v/state"
+	pathToFileList    = "/%v/%v/buckets/%v/files"
+	pathToFile        = "/%v/%v/buckets/%v/files/%v"
 )
-
-func (cl *Client) createRequestB(method string, content []byte, pathFormat string, a ...interface{}) *http.Request {
-	var body io.Reader
-	if content != nil {
-		body = bytes.NewBuffer(content)
-	}
-	return cl.createRequest(method, body, pathFormat, a...)
-}
-
-func (cl *Client) createRequest(method string, body io.Reader, pathFormat string, a ...interface{}) *http.Request {
-	req, err := http.NewRequest(method, fmt.Sprintf(cl.Endpoint+pathFormat, a...), body)
-	if err != nil {
-		panic(err)
-	}
-
-	req.Header.Set("Authorization", "token "+cl.AuthToken)
-	req.Header.Set("User-Agent", cl.UserAgent)
-	return req
-}
 
 // GetBucket describes the current state of a bucket
 func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse, error) {
-	req := cl.createRequest("GET", nil, pathToBucket, account, workspace, bucket)
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(pathToBucket, account, workspace, bucket)).Send()
+	if err != nil {
 		return nil, err
 	}
 
 	var bucketResponse BucketResponse
-	buf, buferr := ioutil.ReadAll(res.Body)
-	if buferr != nil {
-		return nil, buferr
+	if err := res.JSON(&bucketResponse); err != nil {
+		return nil, err
 	}
-	json.Unmarshal(buf, &bucketResponse)
+
 	return &bucketResponse, nil
 }
 
 // SetBucketState sets the current state of a bucket
 func (cl *Client) SetBucketState(account, workspace, bucket, state string) error {
-	req := cl.createRequest("PUT", bytes.NewBufferString(state), pathToBucketState, account, workspace, bucket)
-	req.Header.Add("Content-Type", "application/json")
-
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	_, err := cl.http.Put().
+		AddPath(fmt.Sprintf(pathToBucketState, account, workspace, bucket)).
+		JSON(state).Send()
+	if err != nil {
 		return err
 	}
 
@@ -109,104 +73,76 @@ func (cl *Client) SetBucketState(account, workspace, bucket, state string) error
 
 // GetFile gets a file's content as a read closer
 func (cl *Client) GetFile(account, workspace, bucket, path string) (io.ReadCloser, error) {
-	req := cl.createRequest("GET", nil, pathToFile, account, workspace, bucket, path, false)
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).Send()
+	if err != nil {
 		return nil, err
 	}
 
-	return res.Body, nil
+	return res, nil
 }
 
 // GetFileB gets a file's content as bytes
 func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, error) {
-	body, err := cl.GetFile(account, workspace, bucket, path)
+	res, err := cl.GetFile(account, workspace, bucket, path)
 	if err != nil {
 		return nil, err
 	}
 
-	buf, buferr := ioutil.ReadAll(body)
-	if buferr != nil {
-		return nil, buferr
-	}
-	return buf, nil
+	return res.(*gentleman.Response).Bytes(), nil
 }
 
 // GetFileConflict gets a file's content as a byte slice, or conflict
 func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, error) {
-	req := cl.createRequest("GET", nil, pathToFile, account, workspace, bucket, path, false)
-	req.Header.Add("x-conflict-resolution", "merge")
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).
+		Use(headers.Set("x-conflict-resolution", "merge")).Send()
 
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, nil, reserr
-	}
-
-	if res.StatusCode == 409 {
-		buf, buferr := ioutil.ReadAll(res.Body)
-		if buferr != nil {
-			return nil, nil, buferr
+	if err != nil {
+		if err, ok := err.(errors.StatusCodeError); ok && err.StatusCode == 409 {
+			var conflict Conflict
+			if err := res.JSON(&conflict); err != nil {
+				return nil, nil, err
+			}
+			return nil, &conflict, nil
 		}
-		var conflict Conflict
-		uerr := json.Unmarshal(buf, &conflict)
-		if uerr != nil {
-			return nil, nil, uerr
-		}
-		return nil, &conflict, nil
-	}
-	if err := errors.StatusCode(res); err != nil {
 		return nil, nil, err
 	}
 
-	return res.Body, nil, nil
+	return res, nil, nil
 }
 
 // GetFileConflictB gets a file's content as bytes or conflict
 func (cl *Client) GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, error) {
-	body, conflict, err := cl.GetFileConflict(account, workspace, bucket, path)
+	res, conflict, err := cl.GetFileConflict(account, workspace, bucket, path)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if conflict != nil {
 		return nil, conflict, nil
 	}
 
-	buf, buferr := ioutil.ReadAll(body)
-	if buferr != nil {
-		return nil, nil, buferr
-	}
-	return buf, nil, nil
+	return res.(*gentleman.Response).Bytes(), nil, nil
 }
 
 // SaveFile saves a file to a workspace
 func (cl *Client) SaveFile(account, workspace, bucket, path string, body io.Reader) error {
-	req := cl.createRequest("PUT", body, pathToFile, account, workspace, bucket, path, false)
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
-		return err
-	}
-	return nil
+	_, err := cl.http.Put().
+		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).
+		Body(body).Send()
+
+	return err
 }
 
 // SaveFileB saves a file to a workspace
 func (cl *Client) SaveFileB(account, workspace, bucket, path string, body []byte, contentType string, unzip bool) error {
-	req := cl.createRequestB("PUT", body, pathToFile, account, workspace, bucket, path, unzip)
-	req.Header.Set("Content-Type", contentType)
+	_, err := cl.http.Put().
+		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).
+		SetQuery("unzip", fmt.Sprintf("%v", unzip)).
+		Body(bytes.NewReader(body)).Send()
 
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // ListFiles returns a list of files, given a prefix
@@ -214,24 +150,23 @@ func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, s
 	if size <= 0 {
 		size = 100
 	}
-	prefix = url.QueryEscape(prefix)
-	marker = url.QueryEscape(marker)
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(pathToFileList, account, workspace, bucket)).
+		SetQueryParams(map[string]string{
+			"prefix": prefix,
+			"marker": marker,
+			"size":   fmt.Sprintf("%d", size),
+		}).Send()
 
-	req := cl.createRequest("GET", nil, pathToFileList, account, workspace, bucket, prefix, marker, size)
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return nil, reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
+	if err != nil {
 		return nil, err
 	}
 
 	var fileListResponse FileListResponse
-	buf, buferr := ioutil.ReadAll(res.Body)
-	if buferr != nil {
-		return nil, buferr
+	if err := res.JSON(&fileListResponse); err != nil {
+		return nil, err
 	}
-	json.Unmarshal(buf, &fileListResponse)
+
 	return &fileListResponse, nil
 }
 
@@ -264,14 +199,8 @@ func (cl *Client) ListAllFiles(account, workspace, bucket, prefix string, size i
 
 // DeleteFile deletes a file from the workspace
 func (cl *Client) DeleteFile(account, workspace, bucket, path string) error {
-	req := cl.createRequest("DELETE", nil, pathToFile, account, workspace, bucket, path, false)
-	res, reserr := hcli.Do(req)
-	if reserr != nil {
-		return reserr
-	}
-	if err := errors.StatusCode(res); err != nil {
-		return err
-	}
+	_, err := cl.http.Delete().
+		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).Send()
 
-	return nil
+	return err
 }
