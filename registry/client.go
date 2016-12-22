@@ -3,11 +3,12 @@ package registry
 import (
 	"fmt"
 
+	gentleman "gopkg.in/h2non/gentleman.v1"
+
 	"io"
 
 	"github.com/vtex/apps-utils/appidentifier"
 	"github.com/vtex/go-clients/clients"
-	"gopkg.in/h2non/gentleman.v1"
 )
 
 // Registry is an interface for interacting with the registry
@@ -51,7 +52,7 @@ func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
 	}
 
 	var m Manifest
-	if err := res.JSON(m); err != nil {
+	if err := res.JSON(&m); err != nil {
 		return nil, err
 	}
 
