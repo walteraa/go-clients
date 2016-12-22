@@ -17,7 +17,7 @@ type IdentityListResponseEntry struct {
 }
 
 type IdentityListResponse struct {
-	Identities []*IdentityListResponseEntry `json:"identities"`
+	Identities []*IdentityListResponseEntry `json:"data"`
 }
 
 type File struct {
