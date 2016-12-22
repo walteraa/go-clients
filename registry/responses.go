@@ -2,10 +2,11 @@ package registry
 
 type Manifest struct {
 	ID           string            `json:"id"`
-	Vendor       string            `json:"vendor"`
-	Name         string            `json:"name"`
-	Version      string            `json:"version"`
+	Title        string            `json:"title"`
+	Description  string            `json:"description"`
+	Categories   []string          `json:"categories"`
 	Dependencies map[string]string `json:"dependencies"`
+	Services     []string          `json:"_services"`
 }
 
 type IdentityListResponseEntry struct {
