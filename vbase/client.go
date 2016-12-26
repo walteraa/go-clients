@@ -153,8 +153,8 @@ func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, s
 		AddPath(fmt.Sprintf(pathToFileList, account, workspace, bucket)).
 		SetQueryParams(map[string]string{
 			"prefix": prefix,
-			"marker": marker,
-			"size":   fmt.Sprintf("%d", size),
+			"_next":  marker,
+			"_limit": fmt.Sprintf("%d", size),
 		}).Send()
 
 	if err != nil {

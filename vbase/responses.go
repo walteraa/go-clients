@@ -14,8 +14,8 @@ type FileListEntryResponse struct {
 
 // FileListResponse is the description of file list
 type FileListResponse struct {
-	Files      []*FileListEntryResponse `json:"files"`
-	NextMarker string                   `json:"nextMarker"`
+	Files      []*FileListEntryResponse `json:"data"`
+	NextMarker string                   `json:"next"`
 }
 
 // Conflict a 409 response's payload
