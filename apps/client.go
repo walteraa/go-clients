@@ -16,6 +16,7 @@ type Apps interface {
 	GetFile(account, workspace, app string, context []string, path string) (io.ReadCloser, error)
 	GetFileB(account, workspace, app string, context []string, path string) ([]byte, error)
 	GetFileJ(account, workspace, app string, context []string, path string, dest interface{}) error
+	GetDependencies(account, workspace string) (map[string][]string, error)
 }
 
 // Client is a struct that provides interaction with apps
@@ -29,9 +30,10 @@ func NewClient(endpoint, authToken, userAgent string) Apps {
 }
 
 const (
-	pathToApp   = "/%v/%v/apps/%v"
-	pathToFiles = "/%v/%v/apps/%v/files"
-	pathToFile  = "/%v/%v/apps/%v/files/%v"
+	pathToDependencies = "/%v/%v/dependencies"
+	pathToApp          = "/%v/%v/apps/%v"
+	pathToFiles        = "/%v/%v/apps/%v/files"
+	pathToFile         = "/%v/%v/apps/%v/files/%v"
 )
 
 // GetApp describes an installed app's manifest
@@ -97,4 +99,15 @@ func (cl *Client) GetFileJ(account, workspace, app string, context []string, pat
 	}
 
 	return nil
+}
+
+func (cl *Client) GetDependencies(account, workspace string) (map[string][]string, error) {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToDependencies, account, workspace)).Send()
+	if err != nil {
+		return nil, err
+	}
+
+	var dependencies map[string][]string
+	err = res.JSON(&dependencies)
+	return dependencies, err
 }
