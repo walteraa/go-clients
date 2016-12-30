@@ -53,10 +53,20 @@ func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
 		return nil, err
 	}
 
+	if res.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(res)
+		if err != nil {
+			return nil, err
+		}
+		return cached.(*Manifest), nil
+	}
+
 	var m Manifest
 	if err := res.JSON(&m); err != nil {
 		return nil, err
 	}
+
+	cl.cache.SetFor(res, &m)
 
 	return &m, nil
 }
@@ -77,10 +87,20 @@ func (cl *Client) ListIdentities(account string, id string, acceptRange bool) (*
 		return nil, err
 	}
 
+	if res.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(res)
+		if err != nil {
+			return nil, err
+		}
+		return cached.(*IdentityListResponse), nil
+	}
+
 	var l IdentityListResponse
 	if err := res.JSON(&l); err != nil {
 		return nil, err
 	}
+
+	cl.cache.SetFor(res, &l)
 
 	return &l, nil
 }
@@ -97,10 +117,20 @@ func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
 		return nil, err
 	}
 
+	if res.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(res)
+		if err != nil {
+			return nil, err
+		}
+		return cached.(*FileList), nil
+	}
+
 	var l FileList
 	if err := res.JSON(&l); err != nil {
 		return nil, err
 	}
+
+	cl.cache.SetFor(res, &l)
 
 	return &l, nil
 }
@@ -126,7 +156,19 @@ func (cl *Client) GetFileB(account string, id string, path string) ([]byte, erro
 		return nil, err
 	}
 
-	return res.(*gentleman.Response).Bytes(), nil
+	gentRes := res.(*gentleman.Response)
+	if gentRes.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(gentRes)
+		if err != nil {
+			return nil, err
+		}
+		return cached.([]byte), nil
+	}
+
+	bytes := gentRes.Bytes()
+	cl.cache.SetFor(gentRes, bytes)
+
+	return bytes, nil
 }
 
 func (cl *Client) GetFileJ(account string, id string, path string, data interface{}) error {
@@ -135,7 +177,19 @@ func (cl *Client) GetFileJ(account string, id string, path string, data interfac
 		return err
 	}
 
-	return res.(*gentleman.Response).JSON(data)
+	gentRes := res.(*gentleman.Response)
+	if gentRes.StatusCode == 304 {
+		data, err = cl.cache.GetFor(gentRes)
+		return err
+	}
+
+	if err := gentRes.JSON(data); err != nil {
+		return err
+	}
+
+	cl.cache.SetFor(gentRes, data)
+
+	return nil
 }
 
 func parseComposedID(id string) (appidentifier.ComposedIdentifier, error) {

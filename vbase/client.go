@@ -52,10 +52,20 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 		return nil, err
 	}
 
+	if res.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(res)
+		if err != nil {
+			return nil, err
+		}
+		return cached.(*BucketResponse), nil
+	}
+
 	var bucketResponse BucketResponse
 	if err := res.JSON(&bucketResponse); err != nil {
 		return nil, err
 	}
+
+	cl.cache.SetFor(res, &bucketResponse)
 
 	return &bucketResponse, nil
 }
@@ -90,7 +100,19 @@ func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, err
 		return nil, err
 	}
 
-	return res.(*gentleman.Response).Bytes(), nil
+	gentRes := res.(*gentleman.Response)
+	if gentRes.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(gentRes)
+		if err != nil {
+			return nil, err
+		}
+		return cached.([]byte), nil
+	}
+
+	bytes := gentRes.Bytes()
+	cl.cache.SetFor(gentRes, bytes)
+
+	return bytes, nil
 }
 
 // GetFileConflict gets a file's content as a byte slice, or conflict
@@ -124,7 +146,19 @@ func (cl *Client) GetFileConflictB(account, workspace, bucket, path string) ([]b
 		return nil, conflict, nil
 	}
 
-	return res.(*gentleman.Response).Bytes(), nil, nil
+	gentRes := res.(*gentleman.Response)
+	if gentRes.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(gentRes)
+		if err != nil {
+			return nil, nil, err
+		}
+		return cached.([]byte), nil, nil
+	}
+
+	bytes := gentRes.Bytes()
+	cl.cache.SetFor(gentRes, bytes)
+
+	return bytes, nil, nil
 }
 
 // SaveFile saves a file to a workspace
@@ -163,10 +197,20 @@ func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, s
 		return nil, err
 	}
 
+	if res.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(res)
+		if err != nil {
+			return nil, err
+		}
+		return cached.(*FileListResponse), nil
+	}
+
 	var fileListResponse FileListResponse
 	if err := res.JSON(&fileListResponse); err != nil {
 		return nil, err
 	}
+
+	cl.cache.SetFor(res, &fileListResponse)
 
 	return &fileListResponse, nil
 }

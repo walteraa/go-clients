@@ -21,8 +21,8 @@ type Apps interface {
 
 // Client is a struct that provides interaction with apps
 type Client struct {
-	http *gentleman.Client
-	vc   clients.ValueCache
+	http  *gentleman.Client
+	cache clients.ValueCache
 }
 
 // NewClient creates a new Apps client
@@ -46,10 +46,20 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 		return nil, err
 	}
 
+	if res.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(res)
+		if err != nil {
+			return nil, err
+		}
+		return cached.(*Manifest), nil
+	}
+
 	var manifest Manifest
 	if err := res.JSON(&manifest); err != nil {
 		return nil, err
 	}
+
+	cl.cache.SetFor(res, &manifest)
 
 	return &manifest, nil
 }
@@ -61,10 +71,21 @@ func (cl *Client) ListFiles(account, workspace, app string, context []string) (*
 		return nil, err
 	}
 
+	if res.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(res)
+		if err != nil {
+			return nil, err
+		}
+		return cached.(*FileList), nil
+	}
+
 	var files FileList
 	if err := res.JSON(&files); err != nil {
 		return nil, err
 	}
+
+	cl.cache.SetFor(res, &files)
+
 	return &files, nil
 }
 
@@ -86,7 +107,19 @@ func (cl *Client) GetFileB(account, workspace, app string, context []string, pat
 		return nil, err
 	}
 
-	return res.(*gentleman.Response).Bytes(), nil
+	gentRes := res.(*gentleman.Response)
+	if gentRes.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(gentRes)
+		if err != nil {
+			return nil, err
+		}
+		return cached.([]byte), nil
+	}
+
+	bytes := gentRes.Bytes()
+	cl.cache.SetFor(gentRes, bytes)
+
+	return bytes, nil
 }
 
 // GetFileJ gets an installed app's file as deserialized JSON object
@@ -96,9 +129,20 @@ func (cl *Client) GetFileJ(account, workspace, app string, context []string, pat
 		return err
 	}
 
-	if err := res.(*gentleman.Response).JSON(&dest); err != nil {
+	gentRes := res.(*gentleman.Response)
+	if gentRes.StatusCode == 304 {
+		dest, err = cl.cache.GetFor(gentRes)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if err := gentRes.JSON(dest); err != nil {
 		return err
 	}
+
+	cl.cache.SetFor(gentRes, dest)
 
 	return nil
 }
@@ -109,7 +153,19 @@ func (cl *Client) GetDependencies(account, workspace string) (map[string][]strin
 		return nil, err
 	}
 
+	if res.StatusCode == 304 {
+		cached, err := cl.cache.GetFor(res)
+		if err != nil {
+			return nil, err
+		}
+		return cached.(map[string][]string), nil
+	}
+
 	var dependencies map[string][]string
-	err = res.JSON(&dependencies)
+	if err := res.JSON(&dependencies); err != nil {
+		return nil, err
+	}
+
+	cl.cache.SetFor(res, dependencies)
 	return dependencies, err
 }
