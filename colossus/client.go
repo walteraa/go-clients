@@ -18,7 +18,8 @@ type Client struct {
 }
 
 func NewClient(endpoint, authToken, userAgent string) Colossus {
-	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
+	cl, _ := clients.CreateClient(endpoint, authToken, userAgent, nil)
+	return &Client{cl}
 }
 
 const (

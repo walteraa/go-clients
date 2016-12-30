@@ -22,11 +22,13 @@ type Apps interface {
 // Client is a struct that provides interaction with apps
 type Client struct {
 	http *gentleman.Client
+	vc   clients.ValueCache
 }
 
 // NewClient creates a new Apps client
-func NewClient(endpoint, authToken, userAgent string) Apps {
-	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
+func NewClient(endpoint, authToken, userAgent string, cacheConfig *clients.CacheConfig) Apps {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, cacheConfig)
+	return &Client{cl, vc}
 }
 
 const (

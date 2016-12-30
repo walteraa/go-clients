@@ -23,12 +23,14 @@ type Registry interface {
 
 // Client is a struct that provides interaction with apps
 type Client struct {
-	http *gentleman.Client
+	http  *gentleman.Client
+	cache clients.ValueCache
 }
 
 // NewClient creates a new Registry client
-func NewClient(endpoint, authToken, userAgent string) Registry {
-	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
+func NewClient(endpoint, authToken, userAgent string, cacheConfig *clients.CacheConfig) Registry {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, cacheConfig)
+	return &Client{cl, vc}
 }
 
 const (

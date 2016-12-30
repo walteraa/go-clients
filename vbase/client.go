@@ -27,12 +27,14 @@ type VBase interface {
 
 // Client is a struct that provides interaction with workspaces
 type Client struct {
-	http *gentleman.Client
+	http  *gentleman.Client
+	cache clients.ValueCache
 }
 
 // NewClient creates a new Workspaces client
-func NewClient(endpoint, authToken, userAgent string) VBase {
-	return &Client{clients.CreateClient(endpoint, authToken, userAgent)}
+func NewClient(endpoint, authToken, userAgent string, cacheConfig *clients.CacheConfig) VBase {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, cacheConfig)
+	return &Client{cl, vc}
 }
 
 const (
