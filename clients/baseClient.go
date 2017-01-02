@@ -45,7 +45,7 @@ func addETag(storage CacheStorage) plugin.Plugin {
 		return plugin.New()
 	}
 
-	return plugin.NewRequestPlugin(func(c *context.Context, h context.Handler) {
+	return plugin.NewPhasePlugin("before dial", func(c *context.Context, h context.Handler) {
 		if c.Request.Method == "" || c.Request.Method == "GET" {
 			if eTag, ok := storage.Get("cached-etag:" + c.Request.URL.String()); ok {
 				c.Request.Header.Add("If-None-Match", eTag.(string))
