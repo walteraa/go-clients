@@ -2,7 +2,7 @@ package clients
 
 import "time"
 
-const metadataHeader = "x-vtex-meta"
+const metadataHeader = "X-Vtex-Meta"
 
 type CacheConfig struct {
 	Storage        CacheStorage
