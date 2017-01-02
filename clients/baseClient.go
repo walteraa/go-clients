@@ -50,9 +50,8 @@ func addETag(storage CacheStorage) plugin.Plugin {
 			if eTag, ok := storage.Get("cached-etag:" + c.Request.URL.String()); ok {
 				c.Request.Header.Add("If-None-Match", eTag.(string))
 			}
-		} else {
-			h.Next(c)
 		}
+		h.Next(c)
 	})
 }
 
@@ -92,6 +91,7 @@ func storeETag(storage CacheStorage, ttl time.Duration) plugin.Plugin {
 		if eTag != "" {
 			storage.Set("cached-etag:"+c.Request.URL.String(), eTag, ttl)
 		}
+		h.Next(c)
 	})
 }
 
@@ -102,5 +102,6 @@ func recordHeaders(reqCtx RequestContext) plugin.Plugin {
 
 	return plugin.NewResponsePlugin(func(c *context.Context, h context.Handler) {
 		reqCtx.AddMetadata(c.Response.Header[metadataHeader])
+		h.Next(c)
 	})
 }
