@@ -32,6 +32,7 @@ const (
 )
 
 func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse, string, error) {
+	const kind = "bucket"
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(bucketPath, account, workspace, bucket)).Send()
 	if err != nil {
@@ -39,7 +40,7 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 	}
 
 	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(res)
+		cached, err := cl.cache.GetFor(kind, res)
 		if err != nil {
 			return nil, "", err
 		}
@@ -51,12 +52,13 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 		return nil, "", err
 	}
 
-	cl.cache.SetFor(res, &bucketResponse)
+	cl.cache.SetFor(kind, res, &bucketResponse)
 
 	return &bucketResponse, res.Header.Get("ETag"), nil
 }
 
 func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*MetadataListResponse, string, error) {
+	const kind = "list"
 	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, account, workspace, bucket))
 	if includeValue {
 		req = req.AddQuery("value", "true")
@@ -68,7 +70,7 @@ func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*M
 	}
 
 	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(res)
+		cached, err := cl.cache.GetFor(kind, res)
 		if err != nil {
 			return nil, "", err
 		}
@@ -80,12 +82,13 @@ func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*M
 		return nil, "", err
 	}
 
-	cl.cache.SetFor(res, &metadata)
+	cl.cache.SetFor(kind, res, &metadata)
 
 	return &metadata, res.Header.Get("ETag"), nil
 }
 
 func (cl *Client) Get(account, workspace, bucket, key string, data interface{}) (string, error) {
+	const kind = "get"
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(metadataKeyPath, account, workspace, bucket, key)).Send()
 	if err != nil {
@@ -93,7 +96,7 @@ func (cl *Client) Get(account, workspace, bucket, key string, data interface{}) 
 	}
 
 	if res.StatusCode == 304 {
-		data, err = cl.cache.GetFor(res)
+		data, err = cl.cache.GetFor(kind, res)
 		if err != nil {
 			return "", err
 		}
@@ -104,7 +107,7 @@ func (cl *Client) Get(account, workspace, bucket, key string, data interface{}) 
 		return "", err
 	}
 
-	cl.cache.SetFor(res, data)
+	cl.cache.SetFor(kind, res, data)
 	return res.Header.Get("ETag"), nil
 }
 

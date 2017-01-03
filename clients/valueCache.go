@@ -8,8 +8,8 @@ import (
 )
 
 type ValueCache interface {
-	GetFor(res *gentleman.Response) (interface{}, error)
-	SetFor(res *gentleman.Response, value interface{}) error
+	GetFor(kind string, res *gentleman.Response) (interface{}, error)
+	SetFor(kind string, res *gentleman.Response, value interface{}) error
 }
 
 type valueCache struct {
@@ -17,13 +17,13 @@ type valueCache struct {
 	ttl     time.Duration
 }
 
-func (c *valueCache) GetFor(res *gentleman.Response) (interface{}, error) {
+func (c *valueCache) GetFor(kind string, res *gentleman.Response) (interface{}, error) {
 	eTag := res.Header.Get("ETag")
 	if eTag == "" {
 		return nil, fmt.Errorf("ETag header not found in response")
 	}
 
-	fromCache, ok := c.storage.Get(fmt.Sprintf("cached-response:%v:%v", res.RawRequest.URL.String(), eTag))
+	fromCache, ok := c.storage.Get(fmt.Sprintf("cached-response:%v:%v:%v", kind, res.RawRequest.URL.String(), eTag))
 	if !ok {
 		return nil, fmt.Errorf("Value not found in cache: " + res.RawRequest.URL.String())
 	}
@@ -31,13 +31,13 @@ func (c *valueCache) GetFor(res *gentleman.Response) (interface{}, error) {
 	return fromCache, nil
 }
 
-func (c *valueCache) SetFor(res *gentleman.Response, value interface{}) error {
+func (c *valueCache) SetFor(kind string, res *gentleman.Response, value interface{}) error {
 	eTag := res.Header.Get("ETag")
 	if eTag == "" {
 		return fmt.Errorf("ETag header not found in response")
 	}
 
-	c.storage.Set(fmt.Sprintf("cached-response:%v:%v", res.RawRequest.URL.String(), eTag), value, c.ttl)
+	c.storage.Set(fmt.Sprintf("cached-response:%v:%v:%v", kind, res.RawRequest.URL.String(), eTag), value, c.ttl)
 
 	return nil
 }

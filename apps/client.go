@@ -40,6 +40,7 @@ const (
 
 // GetApp describes an installed app's manifest
 func (cl *Client) GetApp(account, workspace, app string, context []string) (*Manifest, error) {
+	const kind = "manifest"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, account, workspace, app)).
 		SetQuery("context", strings.Join(context, "/")).Send()
 	if err != nil {
@@ -47,7 +48,7 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 	}
 
 	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(res)
+		cached, err := cl.cache.GetFor(kind, res)
 		if err != nil {
 			return nil, err
 		}
@@ -59,12 +60,13 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 		return nil, err
 	}
 
-	cl.cache.SetFor(res, &manifest)
+	cl.cache.SetFor(kind, res, &manifest)
 
 	return &manifest, nil
 }
 
 func (cl *Client) ListFiles(account, workspace, app string, context []string) (*FileList, error) {
+	const kind = "file-list"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, account, workspace, app)).
 		SetQuery("context", strings.Join(context, "/")).Send()
 	if err != nil {
@@ -72,7 +74,7 @@ func (cl *Client) ListFiles(account, workspace, app string, context []string) (*
 	}
 
 	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(res)
+		cached, err := cl.cache.GetFor(kind, res)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +86,7 @@ func (cl *Client) ListFiles(account, workspace, app string, context []string) (*
 		return nil, err
 	}
 
-	cl.cache.SetFor(res, &files)
+	cl.cache.SetFor(kind, res, &files)
 
 	return &files, nil
 }
@@ -102,6 +104,7 @@ func (cl *Client) GetFile(account, workspace, app string, context []string, path
 
 // GetFileB gets an installed app's file as bytes
 func (cl *Client) GetFileB(account, workspace, app string, context []string, path string) ([]byte, error) {
+	const kind = "file-bytes"
 	res, err := cl.GetFile(account, workspace, app, context, path)
 	if err != nil {
 		return nil, err
@@ -109,7 +112,7 @@ func (cl *Client) GetFileB(account, workspace, app string, context []string, pat
 
 	gentRes := res.(*gentleman.Response)
 	if gentRes.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(gentRes)
+		cached, err := cl.cache.GetFor(kind, gentRes)
 		if err != nil {
 			return nil, err
 		}
@@ -117,13 +120,14 @@ func (cl *Client) GetFileB(account, workspace, app string, context []string, pat
 	}
 
 	bytes := gentRes.Bytes()
-	cl.cache.SetFor(gentRes, bytes)
+	cl.cache.SetFor(kind, gentRes, bytes)
 
 	return bytes, nil
 }
 
 // GetFileJ gets an installed app's file as deserialized JSON object
 func (cl *Client) GetFileJ(account, workspace, app string, context []string, path string, dest interface{}) error {
+	const kind = "file-json"
 	res, err := cl.GetFile(account, workspace, app, context, path)
 	if err != nil {
 		return err
@@ -131,7 +135,7 @@ func (cl *Client) GetFileJ(account, workspace, app string, context []string, pat
 
 	gentRes := res.(*gentleman.Response)
 	if gentRes.StatusCode == 304 {
-		dest, err = cl.cache.GetFor(gentRes)
+		dest, err = cl.cache.GetFor(kind, gentRes)
 		if err != nil {
 			return err
 		}
@@ -142,19 +146,20 @@ func (cl *Client) GetFileJ(account, workspace, app string, context []string, pat
 		return err
 	}
 
-	cl.cache.SetFor(gentRes, dest)
+	cl.cache.SetFor(kind, gentRes, dest)
 
 	return nil
 }
 
 func (cl *Client) GetDependencies(account, workspace string) (map[string][]string, error) {
+	const kind = "dependencies"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToDependencies, account, workspace)).Send()
 	if err != nil {
 		return nil, err
 	}
 
 	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(res)
+		cached, err := cl.cache.GetFor(kind, res)
 		if err != nil {
 			return nil, err
 		}
@@ -166,6 +171,6 @@ func (cl *Client) GetDependencies(account, workspace string) (map[string][]strin
 		return nil, err
 	}
 
-	cl.cache.SetFor(res, dependencies)
+	cl.cache.SetFor(kind, res, dependencies)
 	return dependencies, err
 }

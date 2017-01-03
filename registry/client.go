@@ -42,6 +42,7 @@ const (
 
 // GetApp returns the app metadata
 func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
+	const kind = "app"
 	compID, err := parseComposedID(id)
 	if err != nil {
 		return nil, err
@@ -54,7 +55,7 @@ func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
 	}
 
 	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(res)
+		cached, err := cl.cache.GetFor(kind, res)
 		if err != nil {
 			return nil, err
 		}
@@ -66,12 +67,13 @@ func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
 		return nil, err
 	}
 
-	cl.cache.SetFor(res, &m)
+	cl.cache.SetFor(kind, res, &m)
 
 	return &m, nil
 }
 
 func (cl *Client) ListIdentities(account string, id string, acceptRange bool) (*IdentityListResponse, error) {
+	const kind = "ids"
 	compID, err := parseComposedID(id)
 	if err != nil {
 		return nil, err
@@ -88,7 +90,7 @@ func (cl *Client) ListIdentities(account string, id string, acceptRange bool) (*
 	}
 
 	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(res)
+		cached, err := cl.cache.GetFor(kind, res)
 		if err != nil {
 			return nil, err
 		}
@@ -100,12 +102,13 @@ func (cl *Client) ListIdentities(account string, id string, acceptRange bool) (*
 		return nil, err
 	}
 
-	cl.cache.SetFor(res, &l)
+	cl.cache.SetFor(kind, res, &l)
 
 	return &l, nil
 }
 
 func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
+	const kind = "files"
 	compID, err := parseComposedID(id)
 	if err != nil {
 		return nil, err
@@ -118,7 +121,7 @@ func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
 	}
 
 	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(res)
+		cached, err := cl.cache.GetFor(kind, res)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +133,7 @@ func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
 		return nil, err
 	}
 
-	cl.cache.SetFor(res, &l)
+	cl.cache.SetFor(kind, res, &l)
 
 	return &l, nil
 }
@@ -151,6 +154,7 @@ func (cl *Client) GetFile(account string, id string, path string) (io.ReadCloser
 }
 
 func (cl *Client) GetFileB(account string, id string, path string) ([]byte, error) {
+	const kind = "file-bytes"
 	res, err := cl.GetFile(account, id, path)
 	if err != nil {
 		return nil, err
@@ -158,7 +162,7 @@ func (cl *Client) GetFileB(account string, id string, path string) ([]byte, erro
 
 	gentRes := res.(*gentleman.Response)
 	if gentRes.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(gentRes)
+		cached, err := cl.cache.GetFor(kind, gentRes)
 		if err != nil {
 			return nil, err
 		}
@@ -166,12 +170,13 @@ func (cl *Client) GetFileB(account string, id string, path string) ([]byte, erro
 	}
 
 	bytes := gentRes.Bytes()
-	cl.cache.SetFor(gentRes, bytes)
+	cl.cache.SetFor(kind, gentRes, bytes)
 
 	return bytes, nil
 }
 
 func (cl *Client) GetFileJ(account string, id string, path string, data interface{}) error {
+	const kind = "file-json"
 	res, err := cl.GetFile(account, id, path)
 	if err != nil {
 		return err
@@ -179,7 +184,7 @@ func (cl *Client) GetFileJ(account string, id string, path string, data interfac
 
 	gentRes := res.(*gentleman.Response)
 	if gentRes.StatusCode == 304 {
-		data, err = cl.cache.GetFor(gentRes)
+		data, err = cl.cache.GetFor(kind, gentRes)
 		return err
 	}
 
@@ -187,7 +192,7 @@ func (cl *Client) GetFileJ(account string, id string, path string, data interfac
 		return err
 	}
 
-	cl.cache.SetFor(gentRes, data)
+	cl.cache.SetFor(kind, gentRes, data)
 
 	return nil
 }
