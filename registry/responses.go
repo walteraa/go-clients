@@ -21,7 +21,7 @@ type IdentityListResponse struct {
 }
 
 type File struct {
-	Path     string `json:"file"`
+	Path     string `json:"path"`
 	Hash     string `json:"hash"`
 	Location string `json:"location"`
 }
