@@ -101,7 +101,7 @@ func recordHeaders(reqCtx RequestContext) plugin.Plugin {
 	}
 
 	return plugin.NewResponsePlugin(func(c *context.Context, h context.Handler) {
-		reqCtx.AddMetadata(c.Response.Header[metadataHeader])
+		reqCtx.Parse(c.Response.Header)
 		h.Next(c)
 	})
 }

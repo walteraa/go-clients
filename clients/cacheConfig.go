@@ -2,8 +2,6 @@ package clients
 
 import "time"
 
-const metadataHeader = "X-Vtex-Meta"
-
 type CacheConfig struct {
 	Storage        CacheStorage
 	RequestContext RequestContext

@@ -6,30 +6,39 @@ import (
 )
 
 type RequestContext interface {
-	AddMetadata(keys []string)
-	AddHeadersTo(w http.ResponseWriter)
+	Parse(h http.Header)
+	Write(w http.ResponseWriter)
 }
 
 func NewRequestContext() RequestContext {
-	return &requestContext{metadata: []string{}}
+	return &requestContext{
+		trackedKeys: []string{"X-Vtex-Meta"},
+		headers:     http.Header{},
+	}
 }
 
 type requestContext struct {
-	metadata []string
-	lock     sync.RWMutex
+	trackedKeys []string
+	headers     http.Header
+	lock        sync.RWMutex
 }
 
-func (c *requestContext) AddMetadata(keys []string) {
+func (c *requestContext) Parse(h http.Header) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.metadata = append(c.metadata, keys...)
+
+	for _, k := range c.trackedKeys {
+		for _, v := range h[k] {
+			c.headers.Add(k, v)
+		}
+	}
 }
 
-func (c *requestContext) AddHeadersTo(w http.ResponseWriter) {
+func (c *requestContext) Write(w http.ResponseWriter) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	h := w.Header()
-	for _, k := range c.metadata {
-		h.Add(metadataHeader, k)
+	for k, v := range c.headers {
+		h[k] = v
 	}
 }
