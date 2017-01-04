@@ -43,6 +43,8 @@ func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) 
 			storage: cache.Storage,
 			ttl:     cache.TTL + 30*time.Second, // values should be cached for a little longer than e-tags
 		}
+	} else {
+		vc = &noOpValueCache{}
 	}
 
 	return cl, vc
