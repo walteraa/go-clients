@@ -29,8 +29,8 @@ type Client struct {
 }
 
 // NewClient creates a new Registry client
-func NewClient(endpoint, authToken, userAgent string, cacheConfig *clients.CacheConfig) Registry {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, cacheConfig)
+func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) Registry {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx)
 	return &Client{cl, vc}
 }
 

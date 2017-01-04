@@ -20,8 +20,8 @@ type Client struct {
 	cache clients.ValueCache
 }
 
-func NewClient(endpoint, authToken, userAgent string, cacheConfig *clients.CacheConfig) Metadata {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, cacheConfig)
+func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) Metadata {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx)
 	return &Client{cl, vc}
 }
 

@@ -8,12 +8,14 @@ import (
 type RequestContext interface {
 	Parse(h http.Header)
 	Write(w http.ResponseWriter)
+	getCache() *CacheConfig
 }
 
-func NewRequestContext() RequestContext {
+func NewRequestContext(cache *CacheConfig) RequestContext {
 	return &requestContext{
 		trackedKeys: []string{"X-Vtex-Meta"},
 		headers:     http.Header{},
+		cache:       cache,
 	}
 }
 
@@ -21,6 +23,8 @@ type requestContext struct {
 	trackedKeys []string
 	headers     http.Header
 	lock        sync.RWMutex
+
+	cache *CacheConfig
 }
 
 func (c *requestContext) Parse(h http.Header) {
@@ -41,4 +45,8 @@ func (c *requestContext) Write(w http.ResponseWriter) {
 	for k, v := range c.headers {
 		h[k] = v
 	}
+}
+
+func (c *requestContext) getCache() *CacheConfig {
+	return c.cache
 }

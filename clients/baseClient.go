@@ -16,24 +16,32 @@ import (
 
 const cacheStorageKey = "cache-storage"
 
-func CreateClient(endpoint, authToken, userAgent string, cacheConfig *CacheConfig) (*gentleman.Client, ValueCache) {
+func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) (*gentleman.Client, ValueCache) {
 	cl := gentleman.New().
 		BaseURL(strings.TrimRight(endpoint, "/")).
 		Use(timeout.Request(5 * time.Second)).
 		Use(headers.Set("Authorization", "token "+authToken)).
 		Use(headers.Set("User-Agent", userAgent)).
-		Use(responseErrors())
+		Use(responseErrors()).
+		Use(recordHeaders(reqCtx))
 
 	var vc ValueCache
-	if cacheConfig != nil && cacheConfig.Storage != nil && cacheConfig.RequestContext != nil {
+	if cache := reqCtx.getCache(); cache != nil {
+		if cache.TTL <= 0 {
+			panic("Cache TTL should be greater than zero")
+		}
+		if cache.Storage == nil {
+			panic("Cache storage should not be <nil>")
+		}
+
 		cl = cl.
-			Use(addETag(cacheConfig.Storage)).
-			Use(storeETag(cacheConfig.Storage, cacheConfig.TTL)).
-			Use(recordHeaders(cacheConfig.RequestContext))
-		cl.Context.Set(cacheStorageKey, cacheConfig.Storage)
+			Use(addETag(cache.Storage)).
+			Use(storeETag(cache.Storage, cache.TTL))
+		cl.Context.Set(cacheStorageKey, cache.Storage)
+
 		vc = &valueCache{
-			storage: cacheConfig.Storage,
-			ttl:     cacheConfig.TTL + 30*time.Second, // values should be cached for a little longer than e-tags
+			storage: cache.Storage,
+			ttl:     cache.TTL + 30*time.Second, // values should be cached for a little longer than e-tags
 		}
 	}
 

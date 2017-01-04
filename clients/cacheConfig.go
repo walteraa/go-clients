@@ -3,9 +3,8 @@ package clients
 import "time"
 
 type CacheConfig struct {
-	Storage        CacheStorage
-	RequestContext RequestContext
-	TTL            time.Duration
+	Storage CacheStorage
+	TTL     time.Duration
 }
 
 type CacheStorage interface {

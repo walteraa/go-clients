@@ -27,8 +27,8 @@ type Client struct {
 }
 
 // NewClient creates a new Apps client
-func NewClient(endpoint, authToken, userAgent string, cacheConfig *clients.CacheConfig) Apps {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, cacheConfig)
+func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) Apps {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx)
 	return &Client{cl, vc}
 }
 

@@ -32,8 +32,8 @@ type Client struct {
 }
 
 // NewClient creates a new Workspaces client
-func NewClient(endpoint, authToken, userAgent string, cacheConfig *clients.CacheConfig) VBase {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, cacheConfig)
+func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) VBase {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx)
 	return &Client{cl, vc}
 }
 
