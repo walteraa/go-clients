@@ -55,11 +55,9 @@ func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
 		return nil, err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.(*Manifest), nil
 	}
 
@@ -90,11 +88,9 @@ func (cl *Client) ListIdentities(account string, id string, acceptRange bool) (*
 		return nil, err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.(*IdentityListResponse), nil
 	}
 
@@ -121,11 +117,9 @@ func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
 		return nil, err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.(*FileList), nil
 	}
 
@@ -162,11 +156,9 @@ func (cl *Client) GetFileB(account string, id string, path string) ([]byte, erro
 	}
 
 	gentRes := res.(*gentleman.Response)
-	if gentRes.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, gentRes)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.([]byte), nil
 	}
 

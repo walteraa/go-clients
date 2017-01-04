@@ -48,11 +48,9 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 		return nil, err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.(*Manifest), nil
 	}
 
@@ -74,11 +72,9 @@ func (cl *Client) ListFiles(account, workspace, app string, context []string) (*
 		return nil, err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.(*FileList), nil
 	}
 
@@ -112,11 +108,9 @@ func (cl *Client) GetFileB(account, workspace, app string, context []string, pat
 	}
 
 	gentRes := res.(*gentleman.Response)
-	if gentRes.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, gentRes)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.([]byte), nil
 	}
 
@@ -143,11 +137,9 @@ func (cl *Client) GetDependencies(account, workspace string) (map[string][]strin
 		return nil, err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.(map[string][]string), nil
 	}
 

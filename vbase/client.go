@@ -53,11 +53,9 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 		return nil, err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.(*BucketResponse), nil
 	}
 
@@ -103,11 +101,9 @@ func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, err
 	}
 
 	gentRes := res.(*gentleman.Response)
-	if gentRes.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, gentRes)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.([]byte), nil
 	}
 
@@ -150,11 +146,9 @@ func (cl *Client) GetFileConflictB(account, workspace, bucket, path string) ([]b
 	}
 
 	gentRes := res.(*gentleman.Response)
-	if gentRes.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, gentRes)
-		if err != nil {
-			return nil, nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
+		return nil, nil, err
+	} else if ok {
 		return cached.([]byte), nil, nil
 	}
 
@@ -201,11 +195,9 @@ func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, s
 		return nil, err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, err
+	} else if ok {
 		return cached.(*FileListResponse), nil
 	}
 
