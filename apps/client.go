@@ -1,6 +1,7 @@
 package apps
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -127,28 +128,12 @@ func (cl *Client) GetFileB(account, workspace, app string, context []string, pat
 
 // GetFileJ gets an installed app's file as deserialized JSON object
 func (cl *Client) GetFileJ(account, workspace, app string, context []string, path string, dest interface{}) error {
-	const kind = "file-json"
-	res, err := cl.GetFile(account, workspace, app, context, path)
+	b, err := cl.GetFileB(account, workspace, app, context, path)
 	if err != nil {
 		return err
 	}
 
-	gentRes := res.(*gentleman.Response)
-	if gentRes.StatusCode == 304 {
-		dest, err = cl.cache.GetFor(kind, gentRes)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	if err := gentRes.JSON(dest); err != nil {
-		return err
-	}
-
-	cl.cache.SetFor(kind, gentRes, dest)
-
-	return nil
+	return json.Unmarshal(b, dest)
 }
 
 func (cl *Client) GetDependencies(account, workspace string) (map[string][]string, error) {

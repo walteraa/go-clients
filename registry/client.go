@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"encoding/json"
 	"fmt"
 
 	gentleman "gopkg.in/h2non/gentleman.v1"
@@ -176,25 +177,12 @@ func (cl *Client) GetFileB(account string, id string, path string) ([]byte, erro
 }
 
 func (cl *Client) GetFileJ(account string, id string, path string, data interface{}) error {
-	const kind = "file-json"
-	res, err := cl.GetFile(account, id, path)
+	b, err := cl.GetFileB(account, id, path)
 	if err != nil {
 		return err
 	}
 
-	gentRes := res.(*gentleman.Response)
-	if gentRes.StatusCode == 304 {
-		data, err = cl.cache.GetFor(kind, gentRes)
-		return err
-	}
-
-	if err := gentRes.JSON(data); err != nil {
-		return err
-	}
-
-	cl.cache.SetFor(kind, gentRes, data)
-
-	return nil
+	return json.Unmarshal(b, data)
 }
 
 func parseComposedID(id string) (appidentifier.ComposedIdentifier, error) {
