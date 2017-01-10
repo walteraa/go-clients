@@ -3,10 +3,12 @@ package clients
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net/http"
 	"strings"
 
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/context"
 	"gopkg.in/h2non/gentleman.v1/plugin"
@@ -17,13 +19,18 @@ import (
 const cacheStorageKey = "cache-storage"
 
 func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) (*gentleman.Client, ValueCache) {
+	if reqCtx == nil {
+		panic("reqCtx cannot be <nil>")
+	}
+
 	cl := gentleman.New().
 		BaseURL(strings.TrimRight(endpoint, "/")).
 		Use(timeout.Request(5 * time.Second)).
 		Use(headers.Set("Authorization", "token "+authToken)).
 		Use(headers.Set("User-Agent", userAgent)).
 		Use(responseErrors()).
-		Use(recordHeaders(reqCtx))
+		Use(recordHeaders(reqCtx)).
+		Use(traceRequest(reqCtx))
 
 	var vc ValueCache
 	if cache := reqCtx.getCache(); cache != nil {
@@ -51,10 +58,6 @@ func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) 
 }
 
 func addETag(storage CacheStorage) plugin.Plugin {
-	if storage == nil {
-		return plugin.New()
-	}
-
 	return plugin.NewPhasePlugin("before dial", func(c *context.Context, h context.Handler) {
 		if c.Request.Method == "" || c.Request.Method == "GET" {
 			if eTag, ok := storage.Get("cached-etag:" + c.Request.URL.String()); ok {
@@ -92,10 +95,6 @@ func responseErrors() plugin.Plugin {
 }
 
 func storeETag(storage CacheStorage, ttl time.Duration) plugin.Plugin {
-	if storage == nil {
-		return plugin.New()
-	}
-
 	return plugin.NewResponsePlugin(func(c *context.Context, h context.Handler) {
 		eTag := c.Response.Header.Get("ETag")
 		if eTag != "" {
@@ -106,12 +105,57 @@ func storeETag(storage CacheStorage, ttl time.Duration) plugin.Plugin {
 }
 
 func recordHeaders(reqCtx RequestContext) plugin.Plugin {
-	if reqCtx == nil {
-		return plugin.New()
-	}
-
 	return plugin.NewResponsePlugin(func(c *context.Context, h context.Handler) {
 		reqCtx.Parse(c.Response.Header)
 		h.Next(c)
 	})
+}
+
+func traceRequest(reqCtx RequestContext) plugin.Plugin {
+	const startTime = "startTime"
+
+	p := plugin.New()
+	if reqCtx.isTraceEnabled() {
+		p.SetHandler("request", func(c *context.Context, h context.Handler) {
+			c.Request.Header.Set(enableTraceHeader, "true")
+			c.Set(startTime, time.Now())
+			h.Next(c)
+		})
+		p.SetHandler("response", func(c *context.Context, h context.Handler) {
+			tree := newCallTree(c.Request, c.Response, c.Get(startTime).(time.Time))
+			reqCtx.UpdateS(traceHeader, func(current string) string {
+				var traces []*CallTree
+				if err := json.Unmarshal([]byte(current), &traces); err != nil || current == "" {
+					traces = []*CallTree{}
+				}
+				traces = append(traces, tree)
+
+				js, _ := json.Marshal(traces)
+				return string(js)
+			})
+			h.Next(c)
+		})
+	}
+	return p
+}
+
+type CallTree struct {
+	Call     string      `json:"call"`
+	Status   int         `json:"status"`
+	Time     int64       `json:"time"`
+	Children []*CallTree `json:"children,omitempty"`
+}
+
+func newCallTree(req *http.Request, res *http.Response, start time.Time) *CallTree {
+	resh := res.Header.Get(traceHeader)
+	var children []*CallTree
+	if err := json.Unmarshal([]byte(resh), &children); err != nil && resh != "" {
+		logrus.WithError(err).Error("Failed to unmarshal call trace")
+	}
+	return &CallTree{
+		Call:     req.Method + " " + req.URL.String(),
+		Time:     time.Now().Sub(start).Nanoseconds() / int64(time.Millisecond),
+		Status:   res.StatusCode,
+		Children: children,
+	}
 }

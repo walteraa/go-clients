@@ -6,64 +6,73 @@ import (
 )
 
 const (
-	metadataHeader = "X-Vtex-Meta"
+	metadataHeader    = "X-Vtex-Meta"
+	enableTraceHeader = "X-Vtex-Trace-Enable"
+	traceHeader       = "X-Call-Trace"
 )
 
-type HeaderTracker interface {
+type RequestContext interface {
 	Parse(h http.Header)
 	Write(w http.ResponseWriter)
-}
-
-type RequestContext interface {
-	HeaderTracker
+	UpdateS(header string, update func(current string) string)
 	getCache() *CacheConfig
+	isTraceEnabled() bool
 }
 
-func NewRequestContext(cache *CacheConfig) RequestContext {
+func NewRequestContext(cache *CacheConfig, parent *http.Request) RequestContext {
+	enableTrace := parent.Header.Get(enableTraceHeader) == "true"
+	headers := map[string][]string{}
+	if enableTrace {
+		headers[enableTraceHeader] = []string{"true"}
+	}
 	return &requestContext{
-		trackers: []HeaderTracker{newMetadataForwarder()},
-		cache:    cache,
+		headers:           headers,
+		cache:             cache,
+		enableTraceHeader: enableTrace,
 	}
 }
 
 type requestContext struct {
-	trackers []HeaderTracker
-	cache    *CacheConfig
+	sync.RWMutex
+
+	cache             *CacheConfig
+	headers           http.Header
+	enableTraceHeader bool
 }
 
+// Parse parses an incoming response in order to accumulate headers
 func (c *requestContext) Parse(h http.Header) {
-	for _, t := range c.trackers {
-		t.Parse(h)
+	c.Lock()
+	defer c.Unlock()
+
+	for _, h := range h[metadataHeader] {
+		c.headers.Add(metadataHeader, h)
 	}
 }
 
+// Write writes accumulated headers to an outgoing response
 func (c *requestContext) Write(w http.ResponseWriter) {
-	for _, t := range c.trackers {
-		t.Write(w)
+	c.RLock()
+	defer c.RUnlock()
+
+	headers := w.Header()
+	for h, v := range c.headers {
+		headers[h] = v
 	}
+}
+
+// UpdateS updates the value of a header for the outgoing response
+func (c *requestContext) UpdateS(header string, update func(current string) string) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.headers.Set(header, update(c.headers.Get(header)))
 }
 
 func (c *requestContext) getCache() *CacheConfig {
 	return c.cache
 }
 
-type metadataForwarder struct {
-	metadata []string
-	lock     sync.RWMutex
-}
-
-func newMetadataForwarder() *metadataForwarder {
-	return &metadataForwarder{[]string{}, sync.RWMutex{}}
-}
-
-func (f *metadataForwarder) Parse(h http.Header) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.metadata = append(f.metadata, h[metadataHeader]...)
-}
-
-func (f *metadataForwarder) Write(w http.ResponseWriter) {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	w.Header()[metadataHeader] = f.metadata
+func (c *requestContext) isTraceEnabled() bool {
+	return c.enableTraceHeader
 }
