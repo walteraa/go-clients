@@ -5,31 +5,74 @@ import (
 	"sync"
 )
 
+const (
+	metadataHeader    = "X-Vtex-Meta"
+	enableTraceHeader = "X-Vtex-Trace-Enable"
+	traceHeader       = "X-Call-Trace"
+)
+
 type RequestContext interface {
-	AddMetadata(keys []string)
-	AddHeadersTo(w http.ResponseWriter)
+	Parse(h http.Header)
+	Write(w http.ResponseWriter)
+	UpdateS(header string, update func(current string) string)
+	getCache() *CacheConfig
+	isTraceEnabled() bool
 }
 
-func NewRequestContext() RequestContext {
-	return &requestContext{metadata: []string{}}
+func NewRequestContext(cache *CacheConfig, parent *http.Request) RequestContext {
+	enableTrace := parent.Header.Get(enableTraceHeader) == "true"
+	headers := map[string][]string{}
+	if enableTrace {
+		headers[enableTraceHeader] = []string{"true"}
+	}
+	return &requestContext{
+		headers:           headers,
+		cache:             cache,
+		enableTraceHeader: enableTrace,
+	}
 }
 
 type requestContext struct {
-	metadata []string
-	lock     sync.RWMutex
+	sync.RWMutex
+
+	cache             *CacheConfig
+	headers           http.Header
+	enableTraceHeader bool
 }
 
-func (c *requestContext) AddMetadata(keys []string) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.metadata = append(c.metadata, keys...)
-}
+// Parse parses an incoming response in order to accumulate headers
+func (c *requestContext) Parse(h http.Header) {
+	c.Lock()
+	defer c.Unlock()
 
-func (c *requestContext) AddHeadersTo(w http.ResponseWriter) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	h := w.Header()
-	for _, k := range c.metadata {
-		h.Add(metadataHeader, k)
+	for _, h := range h[metadataHeader] {
+		c.headers.Add(metadataHeader, h)
 	}
+}
+
+// Write writes accumulated headers to an outgoing response
+func (c *requestContext) Write(w http.ResponseWriter) {
+	c.RLock()
+	defer c.RUnlock()
+
+	headers := w.Header()
+	for h, v := range c.headers {
+		headers[h] = v
+	}
+}
+
+// UpdateS updates the value of a header for the outgoing response
+func (c *requestContext) UpdateS(header string, update func(current string) string) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.headers.Set(header, update(c.headers.Get(header)))
+}
+
+func (c *requestContext) getCache() *CacheConfig {
+	return c.cache
+}
+
+func (c *requestContext) isTraceEnabled() bool {
+	return c.enableTraceHeader
 }

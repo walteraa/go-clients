@@ -20,8 +20,8 @@ type Client struct {
 	cache clients.ValueCache
 }
 
-func NewClient(endpoint, authToken, userAgent string, cacheConfig *clients.CacheConfig) Metadata {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, cacheConfig)
+func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) Metadata {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx)
 	return &Client{cl, vc}
 }
 
@@ -39,11 +39,9 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 		return nil, "", err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, "", err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, "", err
+	} else if ok {
 		return cached.(*BucketResponse), res.Header.Get("ETag"), nil
 	}
 
@@ -69,11 +67,9 @@ func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*M
 		return nil, "", err
 	}
 
-	if res.StatusCode == 304 {
-		cached, err := cl.cache.GetFor(kind, res)
-		if err != nil {
-			return nil, "", err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return nil, "", err
+	} else if ok {
 		return cached.(*MetadataListResponse), res.Header.Get("ETag"), nil
 	}
 
@@ -95,11 +91,10 @@ func (cl *Client) Get(account, workspace, bucket, key string, data interface{}) 
 		return "", err
 	}
 
-	if res.StatusCode == 304 {
-		data, err = cl.cache.GetFor(kind, res)
-		if err != nil {
-			return "", err
-		}
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
+		return "", err
+	} else if ok {
+		data = cached
 		return res.Header.Get("ETag"), nil
 	}
 
