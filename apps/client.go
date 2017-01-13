@@ -43,6 +43,7 @@ const (
 func (cl *Client) GetApp(account, workspace, app string, context []string) (*Manifest, error) {
 	const kind = "manifest"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, account, workspace, app)).
+		UseRequest(clients.Cache).
 		SetQuery("context", strings.Join(context, "/")).Send()
 	if err != nil {
 		return nil, err
@@ -67,6 +68,7 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 func (cl *Client) ListFiles(account, workspace, app string, context []string) (*FileList, error) {
 	const kind = "file-list"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, account, workspace, app)).
+		UseRequest(clients.Cache).
 		SetQuery("context", strings.Join(context, "/")).Send()
 	if err != nil {
 		return nil, err
@@ -88,10 +90,19 @@ func (cl *Client) ListFiles(account, workspace, app string, context []string) (*
 	return &files, nil
 }
 
+func (cl *Client) getFile(account, workspace, app string, context []string, path string, useCache bool) (io.ReadCloser, error) {
+	req := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, account, workspace, app, path)).
+		SetQuery("context", strings.Join(context, "/"))
+	if useCache {
+		req.UseRequest(clients.Cache)
+	}
+
+	return req.Send()
+}
+
 // GetFile gets an installed app's file as read closer
 func (cl *Client) GetFile(account, workspace, app string, context []string, path string) (io.ReadCloser, error) {
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, account, workspace, app, path)).
-		SetQuery("context", strings.Join(context, "/")).Send()
+	res, err := cl.getFile(account, workspace, app, context, path, false)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +113,7 @@ func (cl *Client) GetFile(account, workspace, app string, context []string, path
 // GetFileB gets an installed app's file as bytes
 func (cl *Client) GetFileB(account, workspace, app string, context []string, path string) ([]byte, error) {
 	const kind = "file-bytes"
-	res, err := cl.GetFile(account, workspace, app, context, path)
+	res, err := cl.getFile(account, workspace, app, context, path, true)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +143,8 @@ func (cl *Client) GetFileJ(account, workspace, app string, context []string, pat
 
 func (cl *Client) GetDependencies(account, workspace string) (map[string][]string, error) {
 	const kind = "dependencies"
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToDependencies, account, workspace)).Send()
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToDependencies, account, workspace)).
+		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, err
 	}

@@ -79,7 +79,8 @@ func (cl *Client) ListIdentities(account string, id string, acceptRange bool) (*
 	}
 
 	req := cl.http.Get().
-		AddPath(fmt.Sprintf(identityPath, account, compID.Prefix(), compID.Suffix()))
+		AddPath(fmt.Sprintf(identityPath, account, compID.Prefix(), compID.Suffix())).
+		UseRequest(clients.Cache)
 	if acceptRange {
 		req = req.SetQuery("acceptRange", "true")
 	}
@@ -112,7 +113,8 @@ func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
 	}
 
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(fileListPath, account, compID.Prefix(), compID.Suffix())).Send()
+		AddPath(fmt.Sprintf(fileListPath, account, compID.Prefix(), compID.Suffix())).
+		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, err
 	}
@@ -133,14 +135,22 @@ func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
 	return &l, nil
 }
 
-func (cl *Client) GetFile(account string, id string, path string) (io.ReadCloser, error) {
+func (cl *Client) getFile(account string, id string, path string, useCache bool) (io.ReadCloser, error) {
 	compID, err := parseComposedID(id)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(fileContentPath, account, compID.Prefix(), compID.Suffix(), path)).Send()
+	req := cl.http.Get().
+		AddPath(fmt.Sprintf(fileContentPath, account, compID.Prefix(), compID.Suffix(), path))
+	if useCache {
+		req.UseRequest(clients.Cache)
+	}
+
+	return req.Send()
+}
+func (cl *Client) GetFile(account string, id string, path string) (io.ReadCloser, error) {
+	res, err := cl.getFile(account, id, path, false)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +160,7 @@ func (cl *Client) GetFile(account string, id string, path string) (io.ReadCloser
 
 func (cl *Client) GetFileB(account string, id string, path string) ([]byte, error) {
 	const kind = "file-bytes"
-	res, err := cl.GetFile(account, id, path)
+	res, err := cl.getFile(account, id, path, true)
 	if err != nil {
 		return nil, err
 	}

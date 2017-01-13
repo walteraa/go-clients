@@ -34,7 +34,8 @@ const (
 func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse, string, error) {
 	const kind = "bucket"
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(bucketPath, account, workspace, bucket)).Send()
+		AddPath(fmt.Sprintf(bucketPath, account, workspace, bucket)).
+		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, "", err
 	}
@@ -57,7 +58,8 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 
 func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*MetadataListResponse, string, error) {
 	const kind = "list"
-	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, account, workspace, bucket))
+	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, account, workspace, bucket)).
+		UseRequest(clients.Cache)
 	if includeValue {
 		req = req.AddQuery("value", "true")
 	}
@@ -86,7 +88,8 @@ func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*M
 func (cl *Client) Get(account, workspace, bucket, key string, data interface{}) (string, error) {
 	const kind = "get"
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(metadataKeyPath, account, workspace, bucket, key)).Send()
+		AddPath(fmt.Sprintf(metadataKeyPath, account, workspace, bucket, key)).
+		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return "", err
 	}

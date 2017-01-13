@@ -81,10 +81,13 @@ func (cl *Client) SetBucketState(account, workspace, bucket, state string) error
 	return nil
 }
 
+func (cl *Client) getFile(account, workspace, bucket, path string) *gentleman.Request {
+	return cl.http.Get().AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path))
+}
+
 // GetFile gets a file's content as a read closer
 func (cl *Client) GetFile(account, workspace, bucket, path string) (io.ReadCloser, error) {
-	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).Send()
+	res, err := cl.getFile(account, workspace, bucket, path).Send()
 	if err != nil {
 		return nil, err
 	}
@@ -95,30 +98,33 @@ func (cl *Client) GetFile(account, workspace, bucket, path string) (io.ReadClose
 // GetFileB gets a file's content as bytes
 func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, error) {
 	const kind = "file-bytes"
-	res, err := cl.GetFile(account, workspace, bucket, path)
+	res, err := cl.getFile(account, workspace, bucket, path).
+		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, err
 	}
 
-	gentRes := res.(*gentleman.Response)
-	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
+	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
 		return nil, err
 	} else if ok {
 		return cached.([]byte), nil
 	}
 
-	bytes := gentRes.Bytes()
-	cl.cache.SetFor(kind, gentRes, bytes)
+	bytes := res.Bytes()
+	cl.cache.SetFor(kind, res, bytes)
 
 	return bytes, nil
 }
 
-// GetFileConflict gets a file's content as a byte slice, or conflict
-func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, error) {
-	res, err := cl.http.Get().
+func (cl *Client) getFileConflict(account, workspace, bucket, path string, useCache bool) (io.ReadCloser, *Conflict, error) {
+	req := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).
-		Use(headers.Set("x-conflict-resolution", "merge")).Send()
+		Use(headers.Set("x-conflict-resolution", "merge"))
+	if useCache {
+		req.UseRequest(clients.Cache)
+	}
 
+	res, err := req.Send()
 	if err != nil {
 		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == 409 {
 			var conflict Conflict
@@ -133,10 +139,15 @@ func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.R
 	return res, nil, nil
 }
 
+// GetFileConflict gets a file's content as a byte slice, or conflict
+func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, error) {
+	return cl.getFileConflict(account, workspace, bucket, path, false)
+}
+
 // GetFileConflictB gets a file's content as bytes or conflict
 func (cl *Client) GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, error) {
 	const kind = "file-conf-bytes"
-	res, conflict, err := cl.GetFileConflict(account, workspace, bucket, path)
+	res, conflict, err := cl.getFileConflict(account, workspace, bucket, path, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -185,6 +196,7 @@ func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, s
 	}
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToFileList, account, workspace, bucket)).
+		UseRequest(clients.Cache).
 		SetQueryParams(map[string]string{
 			"prefix": prefix,
 			"_next":  marker,

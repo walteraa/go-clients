@@ -41,9 +41,7 @@ func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) 
 			panic("Cache storage should not be <nil>")
 		}
 
-		cl = cl.
-			Use(addETag(cache.Storage)).
-			Use(storeETag(cache.Storage, cache.TTL))
+		cl = cl.Use(storeETag(cache.Storage, cache.TTL))
 		cl.Context.Set(cacheStorageKey, cache.Storage)
 
 		vc = &valueCache{
@@ -55,17 +53,6 @@ func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) 
 	}
 
 	return cl, vc
-}
-
-func addETag(storage CacheStorage) plugin.Plugin {
-	return plugin.NewPhasePlugin("before dial", func(c *context.Context, h context.Handler) {
-		if c.Request.Method == "" || c.Request.Method == "GET" {
-			if eTag, ok := storage.Get("cached-etag:" + c.Request.URL.String()); ok {
-				c.Request.Header.Add("If-None-Match", eTag.(string))
-			}
-		}
-		h.Next(c)
-	})
 }
 
 func responseErrors() plugin.Plugin {
@@ -98,7 +85,7 @@ func storeETag(storage CacheStorage, ttl time.Duration) plugin.Plugin {
 	return plugin.NewResponsePlugin(func(c *context.Context, h context.Handler) {
 		eTag := c.Response.Header.Get("ETag")
 		if eTag != "" {
-			storage.Set("cached-etag:"+c.Request.URL.String(), eTag, ttl)
+			storage.Set(eTagKey(c.Request), eTag, ttl)
 		}
 		h.Next(c)
 	})
