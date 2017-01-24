@@ -9,6 +9,7 @@ import (
 
 type Metadata interface {
 	GetBucket(account, workspace, bucket string) (*BucketResponse, string, error)
+	SetBucketState(account, workspace, bucket, state string) error
 	List(account, workspace, bucket string, includeValue bool) (*MetadataListResponse, string, error)
 	Get(account, workspace, bucket, key string, data interface{}) (string, error)
 	Save(account, workspace, bucket, key string, data interface{}) (string, error)
@@ -27,6 +28,7 @@ func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestCont
 
 const (
 	bucketPath      = "/%v/%v/buckets/%v"
+	bucketStatePath = "/%v/%v/buckets/%v/state"
 	metadataPath    = "/%v/%v/buckets/%v/metadata"
 	metadataKeyPath = "/%v/%v/buckets/%v/metadata/%v"
 )
@@ -54,6 +56,16 @@ func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse,
 	cl.cache.SetFor(kind, res, &bucketResponse)
 
 	return &bucketResponse, res.Header.Get("ETag"), nil
+}
+
+func (cl *Client) SetBucketState(account, workspace, bucket, state string) error {
+	_, err := cl.http.Put().
+		AddPath(fmt.Sprintf(bucketStatePath, account, workspace, bucket)).
+		JSON(state).Send()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*MetadataListResponse, string, error) {
