@@ -8,15 +8,15 @@ import (
 
 	"io"
 
-	"github.com/vtex/apps-utils/appidentifier"
+	"github.com/vtex/go-clients/apps"
 	"github.com/vtex/go-clients/clients"
+	"strings"
 )
 
 // Registry is an interface for interacting with the registry
 type Registry interface {
-	GetApp(account string, id string) (*Manifest, error)
-	ListIdentities(account string, id string, acceptRange bool) (*IdentityListResponse, error)
-	ListFiles(account string, id string) (*FileList, error)
+	GetApp(account string, id string) (*Metadata, error)
+	ListFiles(account string, id string) (*apps.FileList, error)
 	GetFile(account string, id string, path string) (io.ReadCloser, error)
 	GetFileB(account string, id string, path string) ([]byte, error)
 	GetFileJ(account string, id string, path string, data interface{}) error
@@ -36,21 +36,21 @@ func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestCont
 
 const (
 	metadataPath    = "/%v/master/registry/%v/%v"
-	identityPath    = "/%v/master/registry/%v/%v/identity"
 	fileListPath    = "/%v/master/registry/%v/%v/files"
 	fileContentPath = "/%v/master/registry/%v/%v/files/%v"
 )
 
 // GetApp returns the app metadata
-func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
+func (cl *Client) GetApp(account string, id string) (*Metadata, error) {
 	const kind = "app"
-	compID, err := parseComposedID(id)
+
+	segments, err := getSegments(id)
 	if err != nil {
 		return nil, err
 	}
 
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(metadataPath, account, compID.Prefix(), compID.Suffix())).Send()
+		AddPath(fmt.Sprintf(metadataPath, account, segments[0], segments[1])).Send()
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +58,10 @@ func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
 		return nil, err
 	} else if ok {
-		return cached.(*Manifest), nil
+		return cached.(*Metadata), nil
 	}
 
-	var m Manifest
+	var m Metadata
 	if err := res.JSON(&m); err != nil {
 		return nil, err
 	}
@@ -71,49 +71,16 @@ func (cl *Client) GetApp(account string, id string) (*Manifest, error) {
 	return &m, nil
 }
 
-func (cl *Client) ListIdentities(account string, id string, acceptRange bool) (*IdentityListResponse, error) {
-	const kind = "ids"
-	compID, err := parseComposedID(id)
-	if err != nil {
-		return nil, err
-	}
-
-	req := cl.http.Get().
-		AddPath(fmt.Sprintf(identityPath, account, compID.Prefix(), compID.Suffix())).
-		UseRequest(clients.Cache)
-	if acceptRange {
-		req = req.SetQuery("acceptRange", "true")
-	}
-	res, err := req.Send()
-	if err != nil {
-		return nil, err
-	}
-
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, err
-	} else if ok {
-		return cached.(*IdentityListResponse), nil
-	}
-
-	var l IdentityListResponse
-	if err := res.JSON(&l); err != nil {
-		return nil, err
-	}
-
-	cl.cache.SetFor(kind, res, &l)
-
-	return &l, nil
-}
-
-func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
+func (cl *Client) ListFiles(account string, id string) (*apps.FileList, error) {
 	const kind = "files"
-	compID, err := parseComposedID(id)
+
+	segments, err := getSegments(id)
 	if err != nil {
 		return nil, err
 	}
 
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(fileListPath, account, compID.Prefix(), compID.Suffix())).
+		AddPath(fmt.Sprintf(fileListPath, account, segments[0], segments[1])).
 		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, err
@@ -122,10 +89,10 @@ func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
 		return nil, err
 	} else if ok {
-		return cached.(*FileList), nil
+		return cached.(*apps.FileList), nil
 	}
 
-	var l FileList
+	var l apps.FileList
 	if err := res.JSON(&l); err != nil {
 		return nil, err
 	}
@@ -136,13 +103,13 @@ func (cl *Client) ListFiles(account string, id string) (*FileList, error) {
 }
 
 func (cl *Client) getFile(account string, id string, path string, useCache bool) (io.ReadCloser, error) {
-	compID, err := parseComposedID(id)
+	segments, err := getSegments(id)
 	if err != nil {
 		return nil, err
 	}
 
 	req := cl.http.Get().
-		AddPath(fmt.Sprintf(fileContentPath, account, compID.Prefix(), compID.Suffix(), path))
+		AddPath(fmt.Sprintf(fileContentPath, account, segments[0], segments[1], path))
 	if useCache {
 		req.UseRequest(clients.Cache)
 	}
@@ -187,14 +154,10 @@ func (cl *Client) GetFileJ(account string, id string, path string, data interfac
 	return json.Unmarshal(b, data)
 }
 
-func parseComposedID(id string) (appidentifier.ComposedIdentifier, error) {
-	appID, err := appidentifier.ParseAppIdentifier(id)
-	if err != nil {
-		return nil, err
+func getSegments(id string) ([]string, error) {
+	segments := strings.SplitN(id, "@", 2)
+	if len(segments) != 2 {
+		return nil, fmt.Errorf("Not a composed app identifier: %s", id)
 	}
-
-	if compID, ok := appID.(appidentifier.ComposedIdentifier); ok {
-		return compID, nil
-	}
-	return nil, fmt.Errorf("Not a composed app identifier: " + id)
+	return segments, nil
 }

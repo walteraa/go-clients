@@ -1,4 +1,4 @@
-package apps
+package engine
 
 import (
 	"encoding/json"
@@ -6,14 +6,15 @@ import (
 	"io"
 	"strings"
 
+	"github.com/vtex/go-clients/apps"
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 )
 
 // Apps is an interface for interacting with apps
 type Apps interface {
-	GetApp(account, workspace, app string, context []string) (*Manifest, error)
-	ListFiles(account, workspace, app string, context []string) (*FileList, error)
+	GetApp(account, workspace, app string, context []string) (*Metadata, error)
+	ListFiles(account, workspace, app string, context []string) (*apps.FileList, error)
 	GetFile(account, workspace, app string, context []string, path string) (io.ReadCloser, error)
 	GetFileB(account, workspace, app string, context []string, path string) ([]byte, error)
 	GetFileJ(account, workspace, app string, context []string, path string, dest interface{}) error
@@ -40,7 +41,7 @@ const (
 )
 
 // GetApp describes an installed app's manifest
-func (cl *Client) GetApp(account, workspace, app string, context []string) (*Manifest, error) {
+func (cl *Client) GetApp(account, workspace, app string, context []string) (*Metadata, error) {
 	const kind = "manifest"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, account, workspace, app)).
 		UseRequest(clients.Cache).
@@ -52,10 +53,10 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
 		return nil, err
 	} else if ok {
-		return cached.(*Manifest), nil
+		return cached.(*Metadata), nil
 	}
 
-	var manifest Manifest
+	var manifest Metadata
 	if err := res.JSON(&manifest); err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func (cl *Client) GetApp(account, workspace, app string, context []string) (*Man
 	return &manifest, nil
 }
 
-func (cl *Client) ListFiles(account, workspace, app string, context []string) (*FileList, error) {
+func (cl *Client) ListFiles(account, workspace, app string, context []string) (*apps.FileList, error) {
 	const kind = "file-list"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, account, workspace, app)).
 		UseRequest(clients.Cache).
@@ -77,10 +78,10 @@ func (cl *Client) ListFiles(account, workspace, app string, context []string) (*
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
 		return nil, err
 	} else if ok {
-		return cached.(*FileList), nil
+		return cached.(*apps.FileList), nil
 	}
 
-	var files FileList
+	var files apps.FileList
 	if err := res.JSON(&files); err != nil {
 		return nil, err
 	}
