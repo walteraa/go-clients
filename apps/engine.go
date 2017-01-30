@@ -1,12 +1,12 @@
 package apps
 
 import (
-	"io"
-	"gopkg.in/h2non/gentleman.v1"
-	"github.com/vtex/go-clients/clients"
-	"fmt"
-	"strings"
 	"encoding/json"
+	"fmt"
+	"github.com/vtex/go-clients/clients"
+	"gopkg.in/h2non/gentleman.v1"
+	"io"
+	"strings"
 )
 
 // Apps is an interface for interacting with apps

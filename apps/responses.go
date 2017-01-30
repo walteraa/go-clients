@@ -36,6 +36,7 @@ type ActiveApp struct {
 	DependencySet    []string          `json:"_dependencySet"`
 	ActivationDate   string            `json:"_activationDate"`
 	Link             string            `json:"_link,omitempty"`
+	Registry         string            `json:"_registry,omitempty"`
 }
 
 // PublishedApp represents a published app's metadata
