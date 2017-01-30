@@ -1,37 +1,33 @@
-package registry
+package apps
 
 import (
-	"encoding/json"
-	"fmt"
-
-	gentleman "gopkg.in/h2non/gentleman.v1"
-
 	"io"
-
-	"github.com/vtex/go-clients/apps"
+	"gopkg.in/h2non/gentleman.v1"
 	"github.com/vtex/go-clients/clients"
+	"fmt"
+	"encoding/json"
 	"strings"
 )
 
 // Registry is an interface for interacting with the registry
 type Registry interface {
-	GetApp(account string, id string) (*Metadata, error)
-	ListFiles(account string, id string) (*apps.FileList, error)
+	GetApp(account string, id string) (*PublishedApp, error)
+	ListFiles(account string, id string) (*FileList, error)
 	GetFile(account string, id string, path string) (io.ReadCloser, error)
 	GetFileB(account string, id string, path string) ([]byte, error)
 	GetFileJ(account string, id string, path string, data interface{}) error
 }
 
 // Client is a struct that provides interaction with apps
-type Client struct {
+type RegistryClient struct {
 	http  *gentleman.Client
 	cache clients.ValueCache
 }
 
 // NewClient creates a new Registry client
-func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) Registry {
+func NewRegistryClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) Registry {
 	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx)
-	return &Client{cl, vc}
+	return &RegistryClient{cl, vc}
 }
 
 const (
@@ -41,7 +37,7 @@ const (
 )
 
 // GetApp returns the app metadata
-func (cl *Client) GetApp(account string, id string) (*Metadata, error) {
+func (cl *RegistryClient) GetApp(account string, id string) (*PublishedApp, error) {
 	const kind = "app"
 
 	segments, err := getSegments(id)
@@ -58,10 +54,10 @@ func (cl *Client) GetApp(account string, id string) (*Metadata, error) {
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
 		return nil, err
 	} else if ok {
-		return cached.(*Metadata), nil
+		return cached.(*PublishedApp), nil
 	}
 
-	var m Metadata
+	var m PublishedApp
 	if err := res.JSON(&m); err != nil {
 		return nil, err
 	}
@@ -71,7 +67,7 @@ func (cl *Client) GetApp(account string, id string) (*Metadata, error) {
 	return &m, nil
 }
 
-func (cl *Client) ListFiles(account string, id string) (*apps.FileList, error) {
+func (cl *RegistryClient) ListFiles(account string, id string) (*FileList, error) {
 	const kind = "files"
 
 	segments, err := getSegments(id)
@@ -89,10 +85,10 @@ func (cl *Client) ListFiles(account string, id string) (*apps.FileList, error) {
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
 		return nil, err
 	} else if ok {
-		return cached.(*apps.FileList), nil
+		return cached.(*FileList), nil
 	}
 
-	var l apps.FileList
+	var l FileList
 	if err := res.JSON(&l); err != nil {
 		return nil, err
 	}
@@ -102,7 +98,7 @@ func (cl *Client) ListFiles(account string, id string) (*apps.FileList, error) {
 	return &l, nil
 }
 
-func (cl *Client) getFile(account string, id string, path string, useCache bool) (io.ReadCloser, error) {
+func (cl *RegistryClient) getFile(account string, id string, path string, useCache bool) (io.ReadCloser, error) {
 	segments, err := getSegments(id)
 	if err != nil {
 		return nil, err
@@ -116,7 +112,7 @@ func (cl *Client) getFile(account string, id string, path string, useCache bool)
 
 	return req.Send()
 }
-func (cl *Client) GetFile(account string, id string, path string) (io.ReadCloser, error) {
+func (cl *RegistryClient) GetFile(account string, id string, path string) (io.ReadCloser, error) {
 	res, err := cl.getFile(account, id, path, false)
 	if err != nil {
 		return nil, err
@@ -125,7 +121,7 @@ func (cl *Client) GetFile(account string, id string, path string) (io.ReadCloser
 	return res, nil
 }
 
-func (cl *Client) GetFileB(account string, id string, path string) ([]byte, error) {
+func (cl *RegistryClient) GetFileB(account string, id string, path string) ([]byte, error) {
 	const kind = "file-bytes"
 	res, err := cl.getFile(account, id, path, true)
 	if err != nil {
@@ -145,7 +141,7 @@ func (cl *Client) GetFileB(account string, id string, path string) ([]byte, erro
 	return bytes, nil
 }
 
-func (cl *Client) GetFileJ(account string, id string, path string, data interface{}) error {
+func (cl *RegistryClient) GetFileJ(account string, id string, path string, data interface{}) error {
 	b, err := cl.GetFileB(account, id, path)
 	if err != nil {
 		return err
