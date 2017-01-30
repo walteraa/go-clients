@@ -1,5 +1,15 @@
 package apps
 
+type File struct {
+	Path     string `json:"path"`
+	Hash     string `json:"hash,omitempty"`
+	Location string `json:"location,omitempty"`
+}
+
+type FileList struct {
+	Files []*File `json:"data"`
+}
+
 // DependencyTree is the recursive representation of dependencies
 //      {
 //          "foo.bar@1.2.3": {
@@ -10,23 +20,36 @@ package apps
 //      }
 type DependencyTree map[string]DependencyTree
 
-// Manifest is an installed app's manifest
-type Manifest struct {
-	Registry       string            `json:"registry"`
-	ID             string            `json:"id"`
-	Vendor         string            `json:"vendor"`
-	Name           string            `json:"name"`
-	Version        string            `json:"version"`
-	Dependencies   map[string]string `json:"dependencies"`
-	DependencyTree DependencyTree    `json:"dependencyTree"`
-	Link           string            `json:"link"`
+// ActiveApp represents an active app's metadata
+type ActiveApp struct {
+	Vendor           string            `json:"vendor"`
+	Name             string            `json:"name"`
+	Version          string            `json:"version"`
+	Title            string            `json:"title"`
+	Description      string            `json:"description"`
+	Categories       []string          `json:"categories"`
+	Dependencies     map[string]string `json:"dependencies"`
+	PeerDependencies map[string]string `json:"peerDependencies"`
+	SettingsSchema   interface{}       `json:"settingsSchema"`
+	ID               string            `json:"_id"`
+	DependencyTree   DependencyTree    `json:"_dependencyTree"`
+	DependencySet    []string          `json:"_dependencySet"`
+	ActivationDate   string            `json:"_activationDate"`
+	Link             string            `json:"_link,omitempty"`
 }
 
-type FileList struct {
-	Files []*File `json:"data"`
-}
-
-type File struct {
-	Path string `json:"path"`
-	Hash string `json:"hash"`
+// PublishedApp represents a published app's metadata
+type PublishedApp struct {
+	Vendor           string            `json:"vendor"`
+	Name             string            `json:"name"`
+	Version          string            `json:"version"`
+	Title            string            `json:"title"`
+	Description      string            `json:"description"`
+	Categories       []string          `json:"categories"`
+	Dependencies     map[string]string `json:"dependencies"`
+	PeerDependencies map[string]string `json:"peerDependencies"`
+	SettingsSchema   interface{}       `json:"settingsSchema"`
+	ID               string            `json:"_id"`
+	Publisher        string            `json:"_publisher"`
+	PublicationDate  string            `json:"_publicationDate"`
 }
