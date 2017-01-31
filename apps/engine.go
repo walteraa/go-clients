@@ -3,10 +3,11 @@ package apps
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vtex/go-clients/clients"
-	"gopkg.in/h2non/gentleman.v1"
 	"io"
 	"strings"
+
+	"github.com/vtex/go-clients/clients"
+	"gopkg.in/h2non/gentleman.v1"
 )
 
 // Apps is an interface for interacting with apps
@@ -42,8 +43,8 @@ const (
 func (cl *AppsClient) GetApp(account, workspace, app string, context []string) (*ActiveApp, error) {
 	const kind = "manifest"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, account, workspace, app)).
-		UseRequest(clients.Cache).
-		SetQuery("context", strings.Join(context, "/")).Send()
+		SetQuery("context", strings.Join(context, "/")).
+		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +68,8 @@ func (cl *AppsClient) GetApp(account, workspace, app string, context []string) (
 func (cl *AppsClient) ListFiles(account, workspace, app string, context []string) (*FileList, error) {
 	const kind = "file-list"
 	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, account, workspace, app)).
-		UseRequest(clients.Cache).
-		SetQuery("context", strings.Join(context, "/")).Send()
+		SetQuery("context", strings.Join(context, "/")).
+		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, err
 	}

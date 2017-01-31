@@ -9,7 +9,7 @@ import (
 // Cache plugin inserts an If-None-Match header if the request URL has a known ETag
 func Cache(c *context.Context, h context.Handler) {
 	if c.Request.Method != "" && c.Request.Method != "GET" {
-	} else if ctxStorage, ok := c.GetOk(cacheStorageKey); !ok {
+	} else if ctxStorage := c.Get(cacheStorageKey); ctxStorage == nil {
 	} else if storage, ok := ctxStorage.(CacheStorage); !ok {
 	} else if eTag, ok := storage.Get(eTagKey(c.Request)); ok {
 		c.Request.Header.Add("If-None-Match", eTag.(string))
