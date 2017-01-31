@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
@@ -109,7 +110,9 @@ func (cl *Client) Get(account, workspace, bucket, key string, data interface{}) 
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
 		return "", err
 	} else if ok {
-		data = cached
+		vt := reflect.ValueOf(data)
+		pt := vt.Elem()
+		pt.Set(reflect.Indirect(reflect.ValueOf(cached).Convert(vt.Type())))
 		return res.Header.Get("ETag"), nil
 	}
 
