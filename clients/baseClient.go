@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/context"
 	"gopkg.in/h2non/gentleman.v1/plugin"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
 	"gopkg.in/h2non/gentleman.v1/plugins/timeout"
-	"gopkg.in/h2non/gentleman.v1"
 )
 
 const cacheStorageKey = "cache-storage"
@@ -92,7 +92,7 @@ func traceRequest(reqCtx RequestContext) plugin.Plugin {
 
 	p := plugin.New()
 	if reqCtx.isTraceEnabled() {
-		p.SetHandler("request", func(c *context.Context, h context.Handler) {
+		p.SetHandler("before dial", func(c *context.Context, h context.Handler) {
 			c.Request.Header.Set(enableTraceHeader, "true")
 			c.Set(startTime, time.Now())
 			h.Next(c)
