@@ -16,7 +16,11 @@ import (
 	"gopkg.in/h2non/gentleman.v1/plugins/timeout"
 )
 
-const cacheStorageKey = "cache-storage"
+const (
+	cacheStorageKey = "cache-storage"
+
+	HeaderETag = "ETag"
+)
 
 func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) (*gentleman.Client, ValueCache) {
 	if reqCtx == nil {

@@ -12,16 +12,16 @@ import (
 
 // Workspaces is an interface for interacting with workspaces
 type VBase interface {
-	GetBucket(account, workspace, bucket string) (*BucketResponse, error)
-	SetBucketState(account, workspace, bucket, state string) error
-	GetFile(account, workspace, bucket, path string) (io.ReadCloser, error)
-	GetFileB(account, workspace, bucket, path string) ([]byte, error)
-	GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, error)
-	GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, error)
-	SaveFile(account, workspace, bucket, path string, body io.Reader) error
-	SaveFileB(account, workspace, bucket, path string, content []byte, contentType string, unzip bool) error
-	ListFiles(account, workspace, bucket, prefix, marker string, size int) (*FileListResponse, error)
-	ListAllFiles(account, workspace, bucket, prefix string, size int) (*FileListResponse, error)
+	GetBucket(account, workspace, bucket string) (*BucketResponse, string, error)
+	SetBucketState(account, workspace, bucket, state string) (string, error)
+	GetFile(account, workspace, bucket, path string) (io.ReadCloser, string, error)
+	GetFileB(account, workspace, bucket, path string) ([]byte, string, error)
+	GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, string, error)
+	GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, string, error)
+	SaveFile(account, workspace, bucket, path string, body io.Reader) (string, error)
+	SaveFileB(account, workspace, bucket, path string, content []byte, contentType string, unzip bool) (string, error)
+	ListFiles(account, workspace, bucket, prefix, marker string, size int) (*FileListResponse, string, error)
+	ListAllFiles(account, workspace, bucket, prefix string, size int) (*FileListResponse, string, error)
 	DeleteFile(account, workspace, bucket, path string) error
 }
 
@@ -45,40 +45,40 @@ const (
 )
 
 // GetBucket describes the current state of a bucket
-func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse, error) {
+func (cl *Client) GetBucket(account, workspace, bucket string) (*BucketResponse, string, error) {
 	const kind = "bucket"
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToBucket, account, workspace, bucket)).Send()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, err
+		return nil, "", err
 	} else if ok {
-		return cached.(*BucketResponse), nil
+		return cached.(*BucketResponse), res.Header.Get(clients.HeaderETag), nil
 	}
 
 	var bucketResponse BucketResponse
 	if err := res.JSON(&bucketResponse); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	cl.cache.SetFor(kind, res, &bucketResponse)
 
-	return &bucketResponse, nil
+	return &bucketResponse, res.Header.Get(clients.HeaderETag), nil
 }
 
 // SetBucketState sets the current state of a bucket
-func (cl *Client) SetBucketState(account, workspace, bucket, state string) error {
+func (cl *Client) SetBucketState(account, workspace, bucket, state string) (string, error) {
 	_, err := cl.http.Put().
 		AddPath(fmt.Sprintf(pathToBucketState, account, workspace, bucket)).
 		JSON(state).Send()
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return "", nil
 }
 
 func (cl *Client) getFile(account, workspace, bucket, path string) *gentleman.Request {
@@ -86,37 +86,37 @@ func (cl *Client) getFile(account, workspace, bucket, path string) *gentleman.Re
 }
 
 // GetFile gets a file's content as a read closer
-func (cl *Client) GetFile(account, workspace, bucket, path string) (io.ReadCloser, error) {
+func (cl *Client) GetFile(account, workspace, bucket, path string) (io.ReadCloser, string, error) {
 	res, err := cl.getFile(account, workspace, bucket, path).Send()
 	if err != nil {
-		return nil, err
+		return nil, res.Header.Get(clients.HeaderETag), err
 	}
 
-	return res, nil
+	return res, res.Header.Get(clients.HeaderETag), nil
 }
 
 // GetFileB gets a file's content as bytes
-func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, error) {
+func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, string, error) {
 	const kind = "file-bytes"
 	res, err := cl.getFile(account, workspace, bucket, path).
 		UseRequest(clients.Cache).Send()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, err
+		return nil, "", err
 	} else if ok {
-		return cached.([]byte), nil
+		return cached.([]byte), res.Header.Get(clients.HeaderETag), nil
 	}
 
 	bytes := res.Bytes()
 	cl.cache.SetFor(kind, res, bytes)
 
-	return bytes, nil
+	return bytes, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *Client) getFileConflict(account, workspace, bucket, path string, useCache bool) (io.ReadCloser, *Conflict, error) {
+func (cl *Client) getFileConflict(account, workspace, bucket, path string, useCache bool) (io.ReadCloser, *Conflict, string, error) {
 	req := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).
 		Use(headers.Set("x-conflict-resolution", "merge"))
@@ -129,67 +129,71 @@ func (cl *Client) getFileConflict(account, workspace, bucket, path string, useCa
 		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == 409 {
 			var conflict Conflict
 			if err := res.JSON(&conflict); err != nil {
-				return nil, nil, err
+				return nil, nil, "", err
 			}
-			return nil, &conflict, nil
+			return nil, &conflict, res.Header.Get(clients.HeaderETag), nil
 		}
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
-	return res, nil, nil
+	return res, nil, res.Header.Get(clients.HeaderETag), nil
 }
 
 // GetFileConflict gets a file's content as a byte slice, or conflict
-func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, error) {
+func (cl *Client) GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, string, error) {
 	return cl.getFileConflict(account, workspace, bucket, path, false)
 }
 
 // GetFileConflictB gets a file's content as bytes or conflict
-func (cl *Client) GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, error) {
+func (cl *Client) GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, string, error) {
 	const kind = "file-conf-bytes"
-	res, conflict, err := cl.getFileConflict(account, workspace, bucket, path, true)
+	res, conflict, eTag, err := cl.getFileConflict(account, workspace, bucket, path, true)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, eTag, err
 	}
 
 	if conflict != nil {
-		return nil, conflict, nil
+		return nil, conflict, eTag, nil
 	}
 
 	gentRes := res.(*gentleman.Response)
 	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	} else if ok {
-		return cached.([]byte), nil, nil
+		return cached.([]byte), nil, gentRes.Header.Get(clients.HeaderETag), nil
 	}
 
 	bytes := gentRes.Bytes()
 	cl.cache.SetFor(kind, gentRes, bytes)
 
-	return bytes, nil, nil
+	return bytes, nil, gentRes.Header.Get(clients.HeaderETag), nil
 }
 
 // SaveFile saves a file to a workspace
-func (cl *Client) SaveFile(account, workspace, bucket, path string, body io.Reader) error {
+func (cl *Client) SaveFile(account, workspace, bucket, path string, body io.Reader) (string, error) {
 	_, err := cl.http.Put().
 		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).
 		Body(body).Send()
 
-	return err
+	return "", err
 }
 
 // SaveFileB saves a file to a workspace
-func (cl *Client) SaveFileB(account, workspace, bucket, path string, body []byte, contentType string, unzip bool) error {
-	_, err := cl.http.Put().
+func (cl *Client) SaveFileB(account, workspace, bucket, path string, body []byte, contentType string, unzip bool) (string, error) {
+	res, err := cl.http.Put().
 		AddPath(fmt.Sprintf(pathToFile, account, workspace, bucket, path)).
 		SetQuery("unzip", fmt.Sprintf("%v", unzip)).
 		Body(bytes.NewReader(body)).Send()
 
-	return err
+	if err != nil {
+		return "", err
+	}
+
+	return res.Header.Get(clients.HeaderETag), nil
 }
 
 // ListFiles returns a list of files, given a prefix
-func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, size int) (*FileListResponse, error) {
+func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, size int) (*FileListResponse, string, error) {
 	const kind = "file-list"
 	if size <= 0 {
 		size = 100
@@ -204,30 +208,30 @@ func (cl *Client) ListFiles(account, workspace, bucket, prefix, marker string, s
 		}).Send()
 
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, err
+		return nil, "", err
 	} else if ok {
-		return cached.(*FileListResponse), nil
+		return cached.(*FileListResponse), res.Header.Get(clients.HeaderETag), nil
 	}
 
 	var fileListResponse FileListResponse
 	if err := res.JSON(&fileListResponse); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	cl.cache.SetFor(kind, res, &fileListResponse)
 
-	return &fileListResponse, nil
+	return &fileListResponse, res.Header.Get(clients.HeaderETag), nil
 }
 
 // ListAllFiles returns a complete list of files, given a prefix
-func (cl *Client) ListAllFiles(account, workspace, bucket, prefix string, size int) (*FileListResponse, error) {
-	partialList, err := cl.ListFiles(account, workspace, bucket, prefix, "", size)
+func (cl *Client) ListAllFiles(account, workspace, bucket, prefix string, size int) (*FileListResponse, string, error) {
+	partialList, eTag, err := cl.ListFiles(account, workspace, bucket, prefix, "", size)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	for {
@@ -235,9 +239,9 @@ func (cl *Client) ListAllFiles(account, workspace, bucket, prefix string, size i
 			break
 		}
 
-		newPartialList, err := cl.ListFiles(account, workspace, bucket, prefix, partialList.NextMarker, size)
+		newPartialList, newETag, err := cl.ListFiles(account, workspace, bucket, prefix, partialList.NextMarker, size)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
 		for _, v := range newPartialList.Files {
@@ -245,9 +249,10 @@ func (cl *Client) ListAllFiles(account, workspace, bucket, prefix string, size i
 		}
 
 		partialList.NextMarker = newPartialList.NextMarker
+		eTag = newETag
 	}
 
-	return partialList, nil
+	return partialList, eTag, nil
 }
 
 // DeleteFile deletes a file from the workspace
