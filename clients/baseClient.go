@@ -13,6 +13,7 @@ import (
 	"gopkg.in/h2non/gentleman.v1/plugin"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
 	"gopkg.in/h2non/gentleman.v1/plugins/timeout"
+	"gopkg.in/h2non/gentleman.v1"
 )
 
 const cacheStorageKey = "cache-storage"
