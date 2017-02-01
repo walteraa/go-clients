@@ -39,6 +39,7 @@ func (c *valueCache) SetFor(kind string, res *gentleman.Response, value interfac
 	eTag := res.Header.Get("ETag")
 	if eTag != "" {
 		c.storage.Set(fmt.Sprintf("cached-response:%v:%v:%v", kind, res.RawRequest.URL.String(), eTag), value, c.ttl)
+		c.storage.Set(eTagKey(res.RawRequest), eTag, c.ttl)
 	}
 
 }

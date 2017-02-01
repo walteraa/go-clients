@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/context"
 	"gopkg.in/h2non/gentleman.v1/plugin"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
@@ -41,7 +40,6 @@ func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) 
 			panic("Cache storage should not be <nil>")
 		}
 
-		cl = cl.Use(storeETag(cache.Storage, cache.TTL))
 		cl.Context.Set(cacheStorageKey, cache.Storage)
 
 		vc = &valueCache{
@@ -78,16 +76,6 @@ func responseErrors() plugin.Plugin {
 			Code:       descr.Code,
 			Message:    descr.Message,
 		})
-	})
-}
-
-func storeETag(storage CacheStorage, ttl time.Duration) plugin.Plugin {
-	return plugin.NewResponsePlugin(func(c *context.Context, h context.Handler) {
-		eTag := c.Response.Header.Get("ETag")
-		if eTag != "" {
-			storage.Set(eTagKey(c.Request), eTag, ttl)
-		}
-		h.Next(c)
 	})
 }
 
