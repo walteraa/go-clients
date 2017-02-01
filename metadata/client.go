@@ -71,11 +71,11 @@ func (cl *Client) SetBucketState(account, workspace, bucket, state string) error
 
 func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*MetadataListResponse, string, error) {
 	const kind = "list"
-	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, account, workspace, bucket)).
-		UseRequest(clients.Cache)
+	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, account, workspace, bucket))
 	if includeValue {
 		req = req.SetQuery("value", "true")
 	}
+	req = req.UseRequest(clients.Cache)
 
 	res, err := req.Send()
 	if err != nil {
