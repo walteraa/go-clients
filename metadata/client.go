@@ -74,7 +74,7 @@ func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*M
 	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, account, workspace, bucket)).
 		UseRequest(clients.Cache)
 	if includeValue {
-		req = req.AddQuery("value", "true")
+		req = req.SetQuery("value", "true")
 	}
 
 	res, err := req.Send()
