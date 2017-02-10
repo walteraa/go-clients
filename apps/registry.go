@@ -26,8 +26,8 @@ type RegistryClient struct {
 }
 
 // NewClient creates a new Registry client
-func NewRegistryClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) Registry {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx)
+func NewRegistryClient(endpoint, authToken, userAgent string, ttl int, reqCtx clients.RequestContext) Registry {
+	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx, ttl)
 	return &RegistryClient{cl, vc}
 }
 

@@ -22,14 +22,17 @@ const (
 	HeaderETag = "ETag"
 )
 
-func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext) (*gentleman.Client, ValueCache) {
+func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext, ttl int) (*gentleman.Client, ValueCache) {
 	if reqCtx == nil {
 		panic("reqCtx cannot be <nil>")
+	}
+	if ttl <= 0 {
+		ttl = 5
 	}
 
 	cl := gentleman.New().
 		BaseURL(strings.TrimRight(endpoint, "/")).
-		Use(timeout.Request(5 * time.Second)).
+		Use(timeout.Request(time.Duration(ttl) * time.Second)).
 		Use(headers.Set("Authorization", "token "+authToken)).
 		Use(headers.Set("User-Agent", userAgent)).
 		Use(responseErrors()).

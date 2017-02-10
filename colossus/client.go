@@ -19,8 +19,8 @@ type Client struct {
 	http *gentleman.Client
 }
 
-func NewClient(endpoint, authToken, userAgent string, reqCtx clients.RequestContext) Colossus {
-	cl, _ := clients.CreateClient(endpoint, authToken, userAgent, reqCtx)
+func NewClient(endpoint, authToken, userAgent string, ttl int, reqCtx clients.RequestContext) Colossus {
+	cl, _ := clients.CreateClient(endpoint, authToken, userAgent, reqCtx, ttl)
 	return &Client{cl}
 }
 
