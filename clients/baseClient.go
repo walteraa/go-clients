@@ -2,6 +2,7 @@ package clients
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -22,25 +23,42 @@ const (
 	HeaderETag = "ETag"
 )
 
-func CreateClient(endpoint, authToken, userAgent string, reqCtx RequestContext, ttl int) (*gentleman.Client, ValueCache) {
-	if reqCtx == nil {
-		panic("reqCtx cannot be <nil>")
+type Config struct {
+	Account        string
+	Workspace      string
+	Region         string
+	Endpoint       string
+	AuthToken      string
+	UserAgent      string
+	RequestContext RequestContext
+	TTL            int
+}
+
+func CreateClient(service string, config *Config) (*gentleman.Client, ValueCache) {
+	if config == nil {
+		panic("config cannot be <nil>")
 	}
+
+	if config.RequestContext == nil {
+		panic("config.RequestContext cannot be <nil>")
+	}
+
+	ttl := config.TTL
 	if ttl <= 0 {
 		ttl = 5
 	}
 
 	cl := gentleman.New().
-		BaseURL(strings.TrimRight(endpoint, "/")).
+		BaseURL(baseURL(service, config)).
 		Use(timeout.Request(time.Duration(ttl) * time.Second)).
-		Use(headers.Set("Authorization", "token "+authToken)).
-		Use(headers.Set("User-Agent", userAgent)).
+		Use(headers.Set("Authorization", "token "+config.AuthToken)).
+		Use(headers.Set("User-Agent", config.UserAgent)).
 		Use(responseErrors()).
-		Use(recordHeaders(reqCtx)).
-		Use(traceRequest(reqCtx))
+		Use(recordHeaders(config.RequestContext)).
+		Use(traceRequest(config.RequestContext))
 
 	var vc ValueCache
-	if cache := reqCtx.getCache(); cache != nil {
+	if cache := config.RequestContext.getCache(); cache != nil {
 		if cache.TTL <= 0 {
 			panic("Cache TTL should be greater than zero")
 		}
@@ -141,4 +159,19 @@ func newCallTree(req *http.Request, res *http.Response, start time.Time) *CallTr
 		Status:   res.StatusCode,
 		Children: children,
 	}
+}
+
+func baseURL(service string, config *Config) string {
+	endpoint := config.Endpoint
+	if endpoint != "" {
+		endpoint = "http://" + strings.TrimRight(endpoint, "/")
+	} else {
+		endpoint = fmt.Sprintf("http://%s.%s.vtex.io", service, config.Region)
+	}
+
+	if config.Account != "" && config.Workspace != "" {
+		return endpoint + "/" + config.Account + "/" + config.Workspace
+	}
+
+	return endpoint
 }

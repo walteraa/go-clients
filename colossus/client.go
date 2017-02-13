@@ -9,53 +9,53 @@ import (
 )
 
 type Colossus interface {
-	SendEventJ(account, workspace, sender, subject, key string, body interface{}) error
-	SendEventB(account, workspace, sender, subject, key string, body []byte) error
-	SendLogJ(account, workspace, sender, subject, level string, body interface{}) error
-	SendLogB(account, workspace, sender, subject, level string, body []byte) error
+	SendEventJ(sender, subject, key string, body interface{}) error
+	SendEventB(sender, subject, key string, body []byte) error
+	SendLogJ(sender, subject, level string, body interface{}) error
+	SendLogB(sender, subject, level string, body []byte) error
 }
 
 type Client struct {
 	http *gentleman.Client
 }
 
-func NewClient(endpoint, authToken, userAgent string, ttl int, reqCtx clients.RequestContext) Colossus {
-	cl, _ := clients.CreateClient(endpoint, authToken, userAgent, reqCtx, ttl)
+func NewClient(config *clients.Config) Colossus {
+	cl, _ := clients.CreateClient("colossus", config)
 	return &Client{cl}
 }
 
 const (
-	eventPath = "/%v/%v/events/%v/%v/%v"
-	logPath   = "/%v/%v/logs/%v/%v/%v"
+	eventPath = "/events/%v/%v/%v"
+	logPath   = "/logs/%v/%v/%v"
 )
 
-func (cl *Client) SendEventJ(account, workspace, sender, subject, key string, body interface{}) error {
+func (cl *Client) SendEventJ(sender, subject, key string, body interface{}) error {
 	_, err := cl.http.Post().
-		AddPath(fmt.Sprintf(eventPath, account, workspace, sender, subject, key)).
+		AddPath(fmt.Sprintf(eventPath, sender, subject, key)).
 		JSON(body).Send()
 
 	return err
 }
 
-func (cl *Client) SendEventB(account, workspace, sender, subject, key string, body []byte) error {
+func (cl *Client) SendEventB(sender, subject, key string, body []byte) error {
 	_, err := cl.http.Post().
-		AddPath(fmt.Sprintf(eventPath, account, workspace, sender, subject, key)).
+		AddPath(fmt.Sprintf(eventPath, sender, subject, key)).
 		Body(bytes.NewReader(body)).Send()
 
 	return err
 }
 
-func (cl *Client) SendLogJ(account, workspace, sender, subject, level string, body interface{}) error {
+func (cl *Client) SendLogJ(sender, subject, level string, body interface{}) error {
 	_, err := cl.http.Post().
-		AddPath(fmt.Sprintf(logPath, account, workspace, sender, subject, level)).
+		AddPath(fmt.Sprintf(logPath, sender, subject, level)).
 		JSON(body).Send()
 
 	return err
 }
 
-func (cl *Client) SendLogB(account, workspace, sender, subject, level string, body []byte) error {
+func (cl *Client) SendLogB(sender, subject, level string, body []byte) error {
 	_, err := cl.http.Post().
-		AddPath(fmt.Sprintf(logPath, account, workspace, sender, subject, level)).
+		AddPath(fmt.Sprintf(logPath, sender, subject, level)).
 		Body(bytes.NewReader(body)).Send()
 
 	return err
