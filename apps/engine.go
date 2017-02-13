@@ -13,12 +13,12 @@ import (
 
 // Apps is an interface for interacting with apps
 type Apps interface {
-	GetApp(account, workspace, app, parentID string) (*ActiveApp, string, error)
-	ListFiles(account, workspace, app, parentID string) (*FileList, string, error)
-	GetFile(account, workspace, app, parentID string, path string) (io.ReadCloser, string, error)
-	GetFileB(account, workspace, app, parentID string, path string) ([]byte, string, error)
-	GetFileJ(account, workspace, app, parentID string, path string, dest interface{}) (string, error)
-	GetDependencies(account, workspace string) (map[string][]string, string, error)
+	GetApp(app, parentID string) (*ActiveApp, string, error)
+	ListFiles(app, parentID string) (*FileList, string, error)
+	GetFile(app, parentID string, path string) (io.ReadCloser, string, error)
+	GetFileB(app, parentID string, path string) ([]byte, string, error)
+	GetFileJ(app, parentID string, path string, dest interface{}) (string, error)
+	GetDependencies() (map[string][]string, string, error)
 }
 
 // Client is a struct that provides interaction with apps
@@ -28,22 +28,22 @@ type AppsClient struct {
 }
 
 // NewClient creates a new Apps client
-func NewAppsClient(endpoint, authToken, userAgent string, ttl int, reqCtx clients.RequestContext) Apps {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx, ttl)
+func NewAppsClient(config *clients.Config) Apps {
+	cl, vc := clients.CreateClient("apps", config)
 	return &AppsClient{cl, vc}
 }
 
 const (
-	pathToDependencies = "/%v/%v/dependencies"
-	pathToApp          = "/%v/%v/apps/%v"
-	pathToFiles        = "/%v/%v/apps/%v/files"
-	pathToFile         = "/%v/%v/apps/%v/files/%v"
+	pathToDependencies = "/dependencies"
+	pathToApp          = "/apps/%v"
+	pathToFiles        = "/apps/%v/files"
+	pathToFile         = "/apps/%v/files/%v"
 )
 
 // GetApp describes an installed app's manifest
-func (cl *AppsClient) GetApp(account, workspace, app, parentID string) (*ActiveApp, string, error) {
+func (cl *AppsClient) GetApp(app, parentID string) (*ActiveApp, string, error) {
 	const kind = "manifest"
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, account, workspace, app)).
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, app)).
 		Use(addParent(parentID)).
 		UseRequest(clients.Cache).Send()
 	if err != nil {
@@ -65,9 +65,9 @@ func (cl *AppsClient) GetApp(account, workspace, app, parentID string) (*ActiveA
 	return &manifest, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *AppsClient) ListFiles(account, workspace, app, parentID string) (*FileList, string, error) {
+func (cl *AppsClient) ListFiles(app, parentID string) (*FileList, string, error) {
 	const kind = "file-list"
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, account, workspace, app)).
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, app)).
 		Use(addParent(parentID)).
 		UseRequest(clients.Cache).Send()
 	if err != nil {
@@ -90,8 +90,8 @@ func (cl *AppsClient) ListFiles(account, workspace, app, parentID string) (*File
 	return &files, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *AppsClient) getFile(account, workspace, app, parentID string, path string, useCache bool) (io.ReadCloser, error) {
-	req := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, account, workspace, app, path)).
+func (cl *AppsClient) getFile(app, parentID string, path string, useCache bool) (io.ReadCloser, error) {
+	req := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, app, path)).
 		Use(addParent(parentID))
 	if useCache {
 		req.UseRequest(clients.Cache)
@@ -101,8 +101,8 @@ func (cl *AppsClient) getFile(account, workspace, app, parentID string, path str
 }
 
 // GetFile gets an installed app's file as read closer
-func (cl *AppsClient) GetFile(account, workspace, app, parentID string, path string) (io.ReadCloser, string, error) {
-	res, err := cl.getFile(account, workspace, app, parentID, path, false)
+func (cl *AppsClient) GetFile(app, parentID string, path string) (io.ReadCloser, string, error) {
+	res, err := cl.getFile(app, parentID, path, false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -111,9 +111,9 @@ func (cl *AppsClient) GetFile(account, workspace, app, parentID string, path str
 }
 
 // GetFileB gets an installed app's file as bytes
-func (cl *AppsClient) GetFileB(account, workspace, app, parentID string, path string) ([]byte, string, error) {
+func (cl *AppsClient) GetFileB(app, parentID string, path string) ([]byte, string, error) {
 	const kind = "file-bytes"
-	res, err := cl.getFile(account, workspace, app, parentID, path, true)
+	res, err := cl.getFile(app, parentID, path, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -132,8 +132,8 @@ func (cl *AppsClient) GetFileB(account, workspace, app, parentID string, path st
 }
 
 // GetFileJ gets an installed app's file as deserialized JSON object
-func (cl *AppsClient) GetFileJ(account, workspace, app, parentID string, path string, dest interface{}) (string, error) {
-	b, eTag, err := cl.GetFileB(account, workspace, app, parentID, path)
+func (cl *AppsClient) GetFileJ(app, parentID string, path string, dest interface{}) (string, error) {
+	b, eTag, err := cl.GetFileB(app, parentID, path)
 	if err != nil {
 		return "", err
 	}
@@ -142,9 +142,9 @@ func (cl *AppsClient) GetFileJ(account, workspace, app, parentID string, path st
 	return eTag, err
 }
 
-func (cl *AppsClient) GetDependencies(account, workspace string) (map[string][]string, string, error) {
+func (cl *AppsClient) GetDependencies() (map[string][]string, string, error) {
 	const kind = "dependencies"
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToDependencies, account, workspace)).
+	res, err := cl.http.Get().AddPath(pathToDependencies).
 		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, "", err

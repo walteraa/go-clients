@@ -12,11 +12,11 @@ import (
 
 // Registry is an interface for interacting with the registry
 type Registry interface {
-	GetApp(account string, id string) (*PublishedApp, string, error)
-	ListFiles(account string, id string) (*FileList, string, error)
-	GetFile(account string, id string, path string) (io.ReadCloser, string, error)
-	GetFileB(account string, id string, path string) ([]byte, string, error)
-	GetFileJ(account string, id string, path string, data interface{}) (string, error)
+	GetApp(id string) (*PublishedApp, string, error)
+	ListFiles(id string) (*FileList, string, error)
+	GetFile(id string, path string) (io.ReadCloser, string, error)
+	GetFileB(id string, path string) ([]byte, string, error)
+	GetFileJ(id string, path string, data interface{}) (string, error)
 }
 
 // Client is a struct that provides interaction with apps
@@ -26,19 +26,20 @@ type RegistryClient struct {
 }
 
 // NewClient creates a new Registry client
-func NewRegistryClient(endpoint, authToken, userAgent string, ttl int, reqCtx clients.RequestContext) Registry {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx, ttl)
+func NewRegistryClient(config *clients.Config) Registry {
+	config.Workspace = "master"
+	cl, vc := clients.CreateClient("apps", config)
 	return &RegistryClient{cl, vc}
 }
 
 const (
-	metadataPath    = "/%v/master/registry/%v/%v"
-	fileListPath    = "/%v/master/registry/%v/%v/files"
-	fileContentPath = "/%v/master/registry/%v/%v/files/%v"
+	metadataPath    = "/registry/%v/%v"
+	fileListPath    = "/registry/%v/%v/files"
+	fileContentPath = "/registry/%v/%v/files/%v"
 )
 
 // GetApp returns the app metadata
-func (cl *RegistryClient) GetApp(account string, id string) (*PublishedApp, string, error) {
+func (cl *RegistryClient) GetApp(id string) (*PublishedApp, string, error) {
 	const kind = "app"
 
 	segments, err := getSegments(id)
@@ -47,7 +48,7 @@ func (cl *RegistryClient) GetApp(account string, id string) (*PublishedApp, stri
 	}
 
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(metadataPath, account, segments[0], segments[1])).Send()
+		AddPath(fmt.Sprintf(metadataPath, segments[0], segments[1])).Send()
 	if err != nil {
 		return nil, "", err
 	}
@@ -68,7 +69,7 @@ func (cl *RegistryClient) GetApp(account string, id string) (*PublishedApp, stri
 	return &m, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *RegistryClient) ListFiles(account string, id string) (*FileList, string, error) {
+func (cl *RegistryClient) ListFiles(id string) (*FileList, string, error) {
 	const kind = "files"
 
 	segments, err := getSegments(id)
@@ -77,7 +78,7 @@ func (cl *RegistryClient) ListFiles(account string, id string) (*FileList, strin
 	}
 
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(fileListPath, account, segments[0], segments[1])).
+		AddPath(fmt.Sprintf(fileListPath, segments[0], segments[1])).
 		UseRequest(clients.Cache).Send()
 	if err != nil {
 		return nil, "", err
@@ -99,14 +100,14 @@ func (cl *RegistryClient) ListFiles(account string, id string) (*FileList, strin
 	return &l, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *RegistryClient) getFile(account string, id string, path string, useCache bool) (io.ReadCloser, error) {
+func (cl *RegistryClient) getFile(id string, path string, useCache bool) (io.ReadCloser, error) {
 	segments, err := getSegments(id)
 	if err != nil {
 		return nil, err
 	}
 
 	req := cl.http.Get().
-		AddPath(fmt.Sprintf(fileContentPath, account, segments[0], segments[1], path))
+		AddPath(fmt.Sprintf(fileContentPath, segments[0], segments[1], path))
 	if useCache {
 		req.UseRequest(clients.Cache)
 	}
@@ -114,8 +115,8 @@ func (cl *RegistryClient) getFile(account string, id string, path string, useCac
 	return req.Send()
 }
 
-func (cl *RegistryClient) GetFile(account string, id string, path string) (io.ReadCloser, string, error) {
-	res, err := cl.getFile(account, id, path, false)
+func (cl *RegistryClient) GetFile(id string, path string) (io.ReadCloser, string, error) {
+	res, err := cl.getFile(id, path, false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -123,9 +124,9 @@ func (cl *RegistryClient) GetFile(account string, id string, path string) (io.Re
 	return res, res.(*gentleman.Response).Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *RegistryClient) GetFileB(account string, id string, path string) ([]byte, string, error) {
+func (cl *RegistryClient) GetFileB(id string, path string) ([]byte, string, error) {
 	const kind = "file-bytes"
-	res, err := cl.getFile(account, id, path, true)
+	res, err := cl.getFile(id, path, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -143,8 +144,8 @@ func (cl *RegistryClient) GetFileB(account string, id string, path string) ([]by
 	return bytes, gentRes.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *RegistryClient) GetFileJ(account string, id string, path string, data interface{}) (string, error) {
-	b, eTag, err := cl.GetFileB(account, id, path)
+func (cl *RegistryClient) GetFileJ(id string, path string, data interface{}) (string, error) {
+	b, eTag, err := cl.GetFileB(id, path)
 	if err != nil {
 		return "", err
 	}
