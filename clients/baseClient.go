@@ -31,7 +31,7 @@ type Config struct {
 	AuthToken      string
 	UserAgent      string
 	RequestContext RequestContext
-	TTL            int
+	Timeout        time.Duration
 }
 
 func CreateClient(service string, config *Config) (*gentleman.Client, ValueCache) {
@@ -43,14 +43,13 @@ func CreateClient(service string, config *Config) (*gentleman.Client, ValueCache
 		panic("config.RequestContext cannot be <nil>")
 	}
 
-	ttl := config.TTL
-	if ttl <= 0 {
-		ttl = 5
+	if config.Timeout <= 0 {
+		config.Timeout = 5 * time.Second
 	}
 
 	cl := gentleman.New().
 		BaseURL(baseURL(service, config)).
-		Use(timeout.Request(time.Duration(ttl) * time.Second)).
+		Use(timeout.Request(config.Timeout)).
 		Use(headers.Set("Authorization", "token "+config.AuthToken)).
 		Use(headers.Set("User-Agent", config.UserAgent)).
 		Use(responseErrors()).
