@@ -8,6 +8,7 @@ import (
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
+	"net/http"
 )
 
 // Workspaces is an interface for interacting with workspaces
@@ -15,7 +16,7 @@ type VBase interface {
 	GetBucket(account, workspace, bucket string) (*BucketResponse, string, error)
 	SetBucketState(account, workspace, bucket, state string) (string, error)
 	GetFile(account, workspace, bucket, path string) (io.ReadCloser, string, error)
-	GetFileB(account, workspace, bucket, path string) ([]byte, string, error)
+	GetFileB(account, workspace, bucket, path string) ([]byte, http.Header, error)
 	GetFileConflict(account, workspace, bucket, path string) (io.ReadCloser, *Conflict, string, error)
 	GetFileConflictB(account, workspace, bucket, path string) ([]byte, *Conflict, string, error)
 	SaveFile(account, workspace, bucket, path string, body io.Reader) (string, error)
@@ -96,24 +97,24 @@ func (cl *Client) GetFile(account, workspace, bucket, path string) (io.ReadClose
 }
 
 // GetFileB gets a file's content as bytes
-func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, string, error) {
+func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, http.Header, error) {
 	const kind = "file-bytes"
 	res, err := cl.getFile(account, workspace, bucket, path).
 		UseRequest(clients.Cache).Send()
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
+		return nil, nil, err
 	} else if ok {
-		return cached.([]byte), res.Header.Get(clients.HeaderETag), nil
+		return cached.([]byte), res.Header, nil
 	}
 
 	bytes := res.Bytes()
 	cl.cache.SetFor(kind, res, bytes)
 
-	return bytes, res.Header.Get(clients.HeaderETag), nil
+	return bytes, res.Header, nil
 }
 
 func (cl *Client) getFileConflict(account, workspace, bucket, path string, useCache bool) (io.ReadCloser, *Conflict, string, error) {
