@@ -6,12 +6,13 @@ import (
 
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
+	"strconv"
 )
 
 type Metadata interface {
 	GetBucket(account, workspace, bucket string) (*BucketResponse, string, error)
 	SetBucketState(account, workspace, bucket, state string) error
-	List(account, workspace, bucket string, includeValue bool) (*MetadataListResponse, string, error)
+	List(account, workspace, bucket string, includeValue bool, limit int) (*MetadataListResponse, string, error)
 	Get(account, workspace, bucket, key string, data interface{}) (string, error)
 	Save(account, workspace, bucket, key string, data interface{}) (string, error)
 	Delete(account, workspace, bucket, key string) (bool, error)
@@ -69,9 +70,10 @@ func (cl *Client) SetBucketState(account, workspace, bucket, state string) error
 	return nil
 }
 
-func (cl *Client) List(account, workspace, bucket string, includeValue bool) (*MetadataListResponse, string, error) {
+func (cl *Client) List(account, workspace, bucket string, includeValue bool, limit int) (*MetadataListResponse, string, error) {
 	const kind = "list"
 	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, account, workspace, bucket))
+	req = req.SetQuery("_limit", strconv.Itoa(limit))
 	if includeValue {
 		req = req.SetQuery("value", "true")
 	}
