@@ -9,6 +9,7 @@ import (
 	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
 	"net/http"
+	"io/ioutil"
 )
 
 // Workspaces is an interface for interacting with workspaces
@@ -111,7 +112,11 @@ func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, htt
 		return cached.([]byte), res.Header, nil
 	}
 
-	bytes := res.Bytes()
+	bytes, err := ioutil.ReadAll(res.RawResponse.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	cl.cache.SetFor(kind, res, bytes)
 
 	return bytes, res.Header, nil
