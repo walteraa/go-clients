@@ -112,6 +112,7 @@ func (cl *Client) GetFileB(account, workspace, bucket, path string) ([]byte, htt
 		return cached.([]byte), res.Header, nil
 	}
 
+	defer res.RawResponse.Body.Close()
 	bytes, err := ioutil.ReadAll(res.RawResponse.Body)
 	if err != nil {
 		return nil, nil, err
