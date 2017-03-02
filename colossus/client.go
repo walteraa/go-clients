@@ -20,7 +20,7 @@ type Client struct {
 }
 
 func NewClient(config *clients.Config) Colossus {
-	cl, _ := clients.CreateClient("colossus", config, true)
+	cl := clients.CreateClient("colossus", config, true)
 	return &Client{cl}
 }
 

@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
@@ -19,13 +18,12 @@ type Metadata interface {
 }
 
 type Client struct {
-	http  *gentleman.Client
-	cache clients.ValueCache
+	http *gentleman.Client
 }
 
 func NewClient(config *clients.Config) Metadata {
-	cl, vc := clients.CreateClient("kube-router", config, true)
-	return &Client{cl, vc}
+	cl := clients.CreateClient("kube-router", config, true)
+	return &Client{cl}
 }
 
 const (
@@ -36,26 +34,16 @@ const (
 )
 
 func (cl *Client) GetBucket(bucket string) (*BucketResponse, string, error) {
-	const kind = "bucket"
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(bucketPath, bucket)).
-		UseRequest(clients.Cache).Send()
+		AddPath(fmt.Sprintf(bucketPath, bucket)).Send()
 	if err != nil {
 		return nil, "", err
-	}
-
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(*BucketResponse), res.Header.Get("ETag"), nil
 	}
 
 	var bucketResponse BucketResponse
 	if err := res.JSON(&bucketResponse); err != nil {
 		return nil, "", err
 	}
-
-	cl.cache.SetFor(kind, res, &bucketResponse)
 
 	return &bucketResponse, res.Header.Get("ETag"), nil
 }
@@ -71,23 +59,15 @@ func (cl *Client) SetBucketState(bucket, state string) error {
 }
 
 func (cl *Client) List(bucket string, includeValue bool, limit int) (*MetadataListResponse, string, error) {
-	const kind = "list"
 	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, bucket))
 	req = req.SetQuery("_limit", strconv.Itoa(limit))
 	if includeValue {
 		req = req.SetQuery("value", "true")
 	}
-	req = req.UseRequest(clients.Cache)
 
 	res, err := req.Send()
 	if err != nil {
 		return nil, "", err
-	}
-
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(*MetadataListResponse), res.Header.Get("ETag"), nil
 	}
 
 	var metadata MetadataListResponse
@@ -95,34 +75,20 @@ func (cl *Client) List(bucket string, includeValue bool, limit int) (*MetadataLi
 		return nil, "", err
 	}
 
-	cl.cache.SetFor(kind, res, &metadata)
-
 	return &metadata, res.Header.Get("ETag"), nil
 }
 
 func (cl *Client) Get(bucket, key string, data interface{}) (string, error) {
-	const kind = "get"
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).
-		UseRequest(clients.Cache).Send()
+		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).Send()
 	if err != nil {
 		return "", err
-	}
-
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return "", err
-	} else if ok {
-		vt := reflect.ValueOf(data)
-		pt := vt.Elem()
-		pt.Set(reflect.Indirect(reflect.ValueOf(cached).Convert(vt.Type())))
-		return res.Header.Get("ETag"), nil
 	}
 
 	if err := res.JSON(data); err != nil {
 		return "", err
 	}
 
-	cl.cache.SetFor(kind, res, data)
 	return res.Header.Get("ETag"), nil
 }
 

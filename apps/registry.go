@@ -21,15 +21,14 @@ type Registry interface {
 
 // Client is a struct that provides interaction with apps
 type RegistryClient struct {
-	http  *gentleman.Client
-	cache clients.ValueCache
+	http *gentleman.Client
 }
 
 // NewClient creates a new Registry client
 func NewRegistryClient(config *clients.Config) Registry {
 	config.Workspace = "master"
-	cl, vc := clients.CreateClient("apps", config, true)
-	return &RegistryClient{cl, vc}
+	cl := clients.CreateClient("apps", config, true)
+	return &RegistryClient{cl}
 }
 
 const (
@@ -40,7 +39,6 @@ const (
 
 // GetApp returns the app metadata
 func (cl *RegistryClient) GetApp(id string) (*PublishedApp, string, error) {
-	const kind = "app"
 
 	segments, err := getSegments(id)
 	if err != nil {
@@ -53,41 +51,24 @@ func (cl *RegistryClient) GetApp(id string) (*PublishedApp, string, error) {
 		return nil, "", err
 	}
 
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(*PublishedApp), res.Header.Get(clients.HeaderETag), nil
-	}
-
 	var m PublishedApp
 	if err := res.JSON(&m); err != nil {
 		return nil, "", err
 	}
 
-	cl.cache.SetFor(kind, res, &m)
-
 	return &m, res.Header.Get(clients.HeaderETag), nil
 }
 
 func (cl *RegistryClient) ListFiles(id string) (*FileList, string, error) {
-	const kind = "files"
-
 	segments, err := getSegments(id)
 	if err != nil {
 		return nil, "", err
 	}
 
 	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(fileListPath, segments[0], segments[1])).
-		UseRequest(clients.Cache).Send()
+		AddPath(fmt.Sprintf(fileListPath, segments[0], segments[1])).Send()
 	if err != nil {
 		return nil, "", err
-	}
-
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(*FileList), res.Header.Get(clients.HeaderETag), nil
 	}
 
 	var l FileList
@@ -95,12 +76,10 @@ func (cl *RegistryClient) ListFiles(id string) (*FileList, string, error) {
 		return nil, "", err
 	}
 
-	cl.cache.SetFor(kind, res, &l)
-
 	return &l, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *RegistryClient) getFile(id string, path string, useCache bool) (io.ReadCloser, error) {
+func (cl *RegistryClient) getFile(id string, path string) (*gentleman.Response, error) {
 	segments, err := getSegments(id)
 	if err != nil {
 		return nil, err
@@ -108,40 +87,26 @@ func (cl *RegistryClient) getFile(id string, path string, useCache bool) (io.Rea
 
 	req := cl.http.Get().
 		AddPath(fmt.Sprintf(fileContentPath, segments[0], segments[1], path))
-	if useCache {
-		req.UseRequest(clients.Cache)
-	}
 
 	return req.Send()
 }
 
 func (cl *RegistryClient) GetFile(id string, path string) (io.ReadCloser, string, error) {
-	res, err := cl.getFile(id, path, false)
+	res, err := cl.getFile(id, path)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return res, res.(*gentleman.Response).Header.Get(clients.HeaderETag), nil
+	return res, res.Header.Get(clients.HeaderETag), nil
 }
 
 func (cl *RegistryClient) GetFileB(id string, path string) ([]byte, string, error) {
-	const kind = "file-bytes"
-	res, err := cl.getFile(id, path, true)
+	res, err := cl.getFile(id, path)
 	if err != nil {
 		return nil, "", err
 	}
 
-	gentRes := res.(*gentleman.Response)
-	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.([]byte), gentRes.Header.Get(clients.HeaderETag), nil
-	}
-
-	bytes := gentRes.Bytes()
-	cl.cache.SetFor(kind, gentRes, bytes)
-
-	return bytes, gentRes.Header.Get(clients.HeaderETag), nil
+	return res.Bytes(), res.Header.Get(clients.HeaderETag), nil
 }
 
 func (cl *RegistryClient) GetFileJ(id string, path string, data interface{}) (string, error) {

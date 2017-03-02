@@ -17,12 +17,11 @@ type Workspaces interface {
 type Client struct {
 	account string
 	http    *gentleman.Client
-	cache   clients.ValueCache
 }
 
 func NewClient(config *clients.Config) Workspaces {
-	cl, vc := clients.CreateClient("kube-router", config, false)
-	return &Client{config.Account, cl, vc}
+	cl := clients.CreateClient("kube-router", config, false)
+	return &Client{config.Account, cl}
 }
 
 const (
@@ -31,16 +30,9 @@ const (
 )
 
 func (cl *Client) List() ([]*Workspace, error) {
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(accountPath, cl.account)).
-		UseRequest(clients.Cache).Send()
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(accountPath, cl.account)).Send()
 	if err != nil {
 		return nil, err
-	}
-
-	if cached, ok, err := cl.cache.GetFor("", res); err != nil {
-		return nil, err
-	} else if ok {
-		return cached.([]*Workspace), nil
 	}
 
 	var workspaces []*Workspace
@@ -52,16 +44,9 @@ func (cl *Client) List() ([]*Workspace, error) {
 }
 
 func (cl *Client) Get(name string) (*Workspace, error) {
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(workspacePath, cl.account, name)).
-		UseRequest(clients.Cache).Send()
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(workspacePath, cl.account, name)).Send()
 	if err != nil {
 		return nil, err
-	}
-
-	if cached, ok, err := cl.cache.GetFor("", res); err != nil {
-		return nil, err
-	} else if ok {
-		return cached.(*Workspace), nil
 	}
 
 	var workspace Workspace

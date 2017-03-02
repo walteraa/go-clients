@@ -15,11 +15,10 @@ type RequestContext interface {
 	Parse(h http.Header)
 	Write(w http.ResponseWriter)
 	UpdateS(header string, update func(current string) string)
-	getCache() *CacheConfig
 	isTraceEnabled() bool
 }
 
-func NewRequestContext(cache *CacheConfig, parent *http.Request) RequestContext {
+func NewRequestContext(parent *http.Request) RequestContext {
 	enableTrace := false
 	if parent != nil {
 		enableTrace = parent.Header.Get(enableTraceHeader) == "true"
@@ -31,15 +30,12 @@ func NewRequestContext(cache *CacheConfig, parent *http.Request) RequestContext 
 	}
 	return &requestContext{
 		headers:           headers,
-		cache:             cache,
 		enableTraceHeader: enableTrace,
 	}
 }
 
 type requestContext struct {
 	sync.RWMutex
-
-	cache             *CacheConfig
 	headers           http.Header
 	enableTraceHeader bool
 }
@@ -71,10 +67,6 @@ func (c *requestContext) UpdateS(header string, update func(current string) stri
 	defer c.Unlock()
 
 	c.headers.Set(header, update(c.headers.Get(header)))
-}
-
-func (c *requestContext) getCache() *CacheConfig {
-	return c.cache
 }
 
 func (c *requestContext) isTraceEnabled() bool {

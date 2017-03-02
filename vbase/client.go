@@ -29,14 +29,13 @@ type VBase interface {
 
 // Client is a struct that provides interaction with workspaces
 type Client struct {
-	http  *gentleman.Client
-	cache clients.ValueCache
+	http *gentleman.Client
 }
 
 // NewClient creates a new Workspaces client
 func NewClient(config *clients.Config) VBase {
-	cl, vc := clients.CreateClient("vbase", config, true)
-	return &Client{cl, vc}
+	cl := clients.CreateClient("vbase", config, true)
+	return &Client{cl}
 }
 
 const (
@@ -48,25 +47,16 @@ const (
 
 // GetBucket describes the current state of a bucket
 func (cl *Client) GetBucket(bucket string) (*BucketResponse, string, error) {
-	const kind = "bucket"
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToBucket, bucket)).Send()
 	if err != nil {
 		return nil, "", err
 	}
 
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(*BucketResponse), res.Header.Get(clients.HeaderETag), nil
-	}
-
 	var bucketResponse BucketResponse
 	if err := res.JSON(&bucketResponse); err != nil {
 		return nil, "", err
 	}
-
-	cl.cache.SetFor(kind, res, &bucketResponse)
 
 	return &bucketResponse, res.Header.Get(clients.HeaderETag), nil
 }
@@ -99,37 +89,18 @@ func (cl *Client) GetFile(bucket, path string) (io.ReadCloser, string, error) {
 
 // GetFileB gets a file's content as bytes
 func (cl *Client) GetFileB(bucket, path string) ([]byte, http.Header, error) {
-	const kind = "file-bytes"
-	res, err := cl.getFile(bucket, path).
-		UseRequest(clients.Cache).Send()
+	res, err := cl.getFile(bucket, path).Send()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, nil, err
-	} else if ok {
-		return cached.([]byte), res.Header, nil
-	}
-
-	defer res.RawResponse.Body.Close()
-	bytes, err := ioutil.ReadAll(res.RawResponse.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	cl.cache.SetFor(kind, res, bytes)
-
-	return bytes, res.Header, nil
+	return res.Bytes(), res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *Client) getFileConflict(bucket, path string, useCache bool) (io.ReadCloser, *Conflict, string, error) {
+func (cl *Client) getFileConflict(bucket, path string) (*gentleman.Response, *Conflict, string, error) {
 	req := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToFile, bucket, path)).
 		Use(headers.Set("x-conflict-resolution", "merge"))
-	if useCache {
-		req.UseRequest(clients.Cache)
-	}
 
 	res, err := req.Send()
 	if err != nil {
@@ -148,13 +119,12 @@ func (cl *Client) getFileConflict(bucket, path string, useCache bool) (io.ReadCl
 
 // GetFileConflict gets a file's content as a byte slice, or conflict
 func (cl *Client) GetFileConflict(bucket, path string) (io.ReadCloser, *Conflict, string, error) {
-	return cl.getFileConflict(bucket, path, false)
+	return cl.getFileConflict(bucket, path)
 }
 
 // GetFileConflictB gets a file's content as bytes or conflict
 func (cl *Client) GetFileConflictB(bucket, path string) ([]byte, *Conflict, string, error) {
-	const kind = "file-conf-bytes"
-	res, conflict, eTag, err := cl.getFileConflict(bucket, path, true)
+	res, conflict, eTag, err := cl.getFileConflict(bucket, path)
 	if err != nil {
 		return nil, nil, eTag, err
 	}
@@ -163,17 +133,7 @@ func (cl *Client) GetFileConflictB(bucket, path string) ([]byte, *Conflict, stri
 		return nil, conflict, eTag, nil
 	}
 
-	gentRes := res.(*gentleman.Response)
-	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
-		return nil, nil, "", err
-	} else if ok {
-		return cached.([]byte), nil, gentRes.Header.Get(clients.HeaderETag), nil
-	}
-
-	bytes := gentRes.Bytes()
-	cl.cache.SetFor(kind, gentRes, bytes)
-
-	return bytes, nil, gentRes.Header.Get(clients.HeaderETag), nil
+	return res.Bytes(), nil, res.Header.Get(clients.HeaderETag), nil
 }
 
 // SaveFile saves a file to a workspace
@@ -201,13 +161,11 @@ func (cl *Client) SaveFileB(bucket, path string, body []byte, contentType string
 
 // ListFiles returns a list of files, given a prefix
 func (cl *Client) ListFiles(bucket, prefix, marker string, size int) (*FileListResponse, string, error) {
-	const kind = "file-list"
 	if size <= 0 {
 		size = 100
 	}
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToFileList, bucket)).
-		UseRequest(clients.Cache).
 		SetQueryParams(map[string]string{
 			"prefix": prefix,
 			"_next":  marker,
@@ -218,18 +176,10 @@ func (cl *Client) ListFiles(bucket, prefix, marker string, size int) (*FileListR
 		return nil, "", err
 	}
 
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(*FileListResponse), res.Header.Get(clients.HeaderETag), nil
-	}
-
 	var fileListResponse FileListResponse
 	if err := res.JSON(&fileListResponse); err != nil {
 		return nil, "", err
 	}
-
-	cl.cache.SetFor(kind, res, &fileListResponse)
 
 	return &fileListResponse, res.Header.Get(clients.HeaderETag), nil
 }

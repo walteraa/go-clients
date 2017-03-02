@@ -17,11 +17,7 @@ import (
 	"gopkg.in/h2non/gentleman.v1/plugins/timeout"
 )
 
-const (
-	cacheStorageKey = "cache-storage"
-
-	HeaderETag = "ETag"
-)
+const HeaderETag = "ETag"
 
 type Config struct {
 	Account        string
@@ -34,7 +30,7 @@ type Config struct {
 	Timeout        time.Duration
 }
 
-func CreateClient(service string, config *Config, workspaceBound bool) (*gentleman.Client, ValueCache) {
+func CreateClient(service string, config *Config, workspaceBound bool) *gentleman.Client {
 	if config == nil {
 		panic("config cannot be <nil>")
 	}
@@ -56,26 +52,7 @@ func CreateClient(service string, config *Config, workspaceBound bool) (*gentlem
 		Use(recordHeaders(config.RequestContext)).
 		Use(traceRequest(config.RequestContext))
 
-	var vc ValueCache
-	if cache := config.RequestContext.getCache(); cache != nil {
-		if cache.TTL <= 0 {
-			panic("Cache TTL should be greater than zero")
-		}
-		if cache.Storage == nil {
-			panic("Cache storage should not be <nil>")
-		}
-
-		cl.Context.Set(cacheStorageKey, cache.Storage)
-
-		vc = &valueCache{
-			storage: cache.Storage,
-			ttl:     cache.TTL + 30*time.Second, // values should be cached for a little longer than e-tags
-		}
-	} else {
-		vc = &noOpValueCache{}
-	}
-
-	return cl, vc
+	return cl
 }
 
 func responseErrors() plugin.Plugin {
