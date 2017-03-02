@@ -35,7 +35,7 @@ type Client struct {
 
 // NewClient creates a new Workspaces client
 func NewClient(config *clients.Config) VBase {
-	cl, vc := clients.CreateClient("vbase", config)
+	cl, vc := clients.CreateClient("vbase", config, true)
 	return &Client{cl, vc}
 }
 

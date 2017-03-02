@@ -20,7 +20,11 @@ type RequestContext interface {
 }
 
 func NewRequestContext(cache *CacheConfig, parent *http.Request) RequestContext {
-	enableTrace := parent.Header.Get(enableTraceHeader) == "true"
+	enableTrace := false
+	if parent != nil {
+		enableTrace = parent.Header.Get(enableTraceHeader) == "true"
+	}
+
 	headers := map[string][]string{}
 	if enableTrace {
 		headers[enableTraceHeader] = []string{"true"}

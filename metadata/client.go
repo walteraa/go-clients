@@ -24,7 +24,7 @@ type Client struct {
 }
 
 func NewClient(config *clients.Config) Metadata {
-	cl, vc := clients.CreateClient("kube-router", config)
+	cl, vc := clients.CreateClient("kube-router", config, true)
 	return &Client{cl, vc}
 }
 

@@ -34,7 +34,7 @@ type Config struct {
 	Timeout        time.Duration
 }
 
-func CreateClient(service string, config *Config) (*gentleman.Client, ValueCache) {
+func CreateClient(service string, config *Config, workspaceBound bool) (*gentleman.Client, ValueCache) {
 	if config == nil {
 		panic("config cannot be <nil>")
 	}
@@ -48,7 +48,7 @@ func CreateClient(service string, config *Config) (*gentleman.Client, ValueCache
 	}
 
 	cl := gentleman.New().
-		BaseURL(baseURL(service, config)).
+		BaseURL(baseURL(service, config, workspaceBound)).
 		Use(timeout.Request(config.Timeout)).
 		Use(headers.Set("Authorization", "token "+config.AuthToken)).
 		Use(headers.Set("User-Agent", config.UserAgent)).
@@ -160,7 +160,7 @@ func newCallTree(req *http.Request, res *http.Response, start time.Time) *CallTr
 	}
 }
 
-func baseURL(service string, config *Config) string {
+func baseURL(service string, config *Config, workspaceBound bool) string {
 	endpoint := config.Endpoint
 	if endpoint != "" {
 		endpoint = "http://" + strings.TrimRight(endpoint, "/")
@@ -168,7 +168,7 @@ func baseURL(service string, config *Config) string {
 		endpoint = fmt.Sprintf("http://%s.%s.vtex.io", service, config.Region)
 	}
 
-	if config.Account != "" && config.Workspace != "" {
+	if workspaceBound {
 		return endpoint + "/" + config.Account + "/" + config.Workspace
 	}
 
