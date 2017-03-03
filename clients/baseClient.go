@@ -28,6 +28,7 @@ type Config struct {
 	UserAgent      string
 	RequestContext RequestContext
 	Timeout        time.Duration
+	Transport      http.RoundTripper
 }
 
 func CreateClient(service string, config *Config, workspaceBound bool) *gentleman.Client {
@@ -51,6 +52,10 @@ func CreateClient(service string, config *Config, workspaceBound bool) *gentlema
 		Use(responseErrors()).
 		Use(recordHeaders(config.RequestContext)).
 		Use(traceRequest(config.RequestContext))
+
+	if config.Transport != nil {
+		cl.Context.Client.Transport = config.Transport
+	}
 
 	return cl
 }
