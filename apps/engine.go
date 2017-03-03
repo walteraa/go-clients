@@ -1,9 +1,7 @@
 package apps
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
@@ -13,47 +11,36 @@ import (
 
 // Apps is an interface for interacting with apps
 type Apps interface {
-	GetApp(account, workspace, app, parentID string) (*ActiveApp, string, error)
-	ListFiles(account, workspace, app, parentID string) (*FileList, string, error)
-	GetFile(account, workspace, app, parentID string, path string) (io.ReadCloser, string, error)
-	GetFileB(account, workspace, app, parentID string, path string) ([]byte, string, error)
-	GetFileJ(account, workspace, app, parentID string, path string, dest interface{}) (string, error)
-	GetDependencies(account, workspace string) (map[string][]string, string, error)
+	GetApp(app, parentID string) (*ActiveApp, string, error)
+	ListFiles(app, parentID string) (*FileList, string, error)
+	GetFile(app, parentID string, path string) (*gentleman.Response, string, error)
+	GetDependencies() (map[string][]string, string, error)
 }
 
 // Client is a struct that provides interaction with apps
 type AppsClient struct {
-	http  *gentleman.Client
-	cache clients.ValueCache
+	http *gentleman.Client
 }
 
 // NewClient creates a new Apps client
-func NewAppsClient(endpoint, authToken, userAgent string, ttl int, reqCtx clients.RequestContext) Apps {
-	cl, vc := clients.CreateClient(endpoint, authToken, userAgent, reqCtx, ttl)
-	return &AppsClient{cl, vc}
+func NewAppsClient(config *clients.Config) Apps {
+	cl := clients.CreateClient("apps", config, true)
+	return &AppsClient{cl}
 }
 
 const (
-	pathToDependencies = "/%v/%v/dependencies"
-	pathToApp          = "/%v/%v/apps/%v"
-	pathToFiles        = "/%v/%v/apps/%v/files"
-	pathToFile         = "/%v/%v/apps/%v/files/%v"
+	pathToDependencies = "/dependencies"
+	pathToApp          = "/apps/%v"
+	pathToFiles        = "/apps/%v/files"
+	pathToFile         = "/apps/%v/files/%v"
 )
 
 // GetApp describes an installed app's manifest
-func (cl *AppsClient) GetApp(account, workspace, app, parentID string) (*ActiveApp, string, error) {
-	const kind = "manifest"
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, account, workspace, app)).
-		Use(addParent(parentID)).
-		UseRequest(clients.Cache).Send()
+func (cl *AppsClient) GetApp(app, parentID string) (*ActiveApp, string, error) {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, app)).
+		Use(addParent(parentID)).Send()
 	if err != nil {
 		return nil, "", err
-	}
-
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(*ActiveApp), res.Header.Get(clients.HeaderETag), nil
 	}
 
 	var manifest ActiveApp
@@ -61,23 +48,14 @@ func (cl *AppsClient) GetApp(account, workspace, app, parentID string) (*ActiveA
 		return nil, "", err
 	}
 
-	cl.cache.SetFor(kind, res, &manifest)
 	return &manifest, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *AppsClient) ListFiles(account, workspace, app, parentID string) (*FileList, string, error) {
-	const kind = "file-list"
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, account, workspace, app)).
-		Use(addParent(parentID)).
-		UseRequest(clients.Cache).Send()
+func (cl *AppsClient) ListFiles(app, parentID string) (*FileList, string, error) {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, app)).
+		Use(addParent(parentID)).Send()
 	if err != nil {
 		return nil, "", err
-	}
-
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(*FileList), res.Header.Get(clients.HeaderETag), nil
 	}
 
 	var files FileList
@@ -85,75 +63,24 @@ func (cl *AppsClient) ListFiles(account, workspace, app, parentID string) (*File
 		return nil, "", err
 	}
 
-	cl.cache.SetFor(kind, res, &files)
-
 	return &files, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *AppsClient) getFile(account, workspace, app, parentID string, path string, useCache bool) (io.ReadCloser, error) {
-	req := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, account, workspace, app, path)).
-		Use(addParent(parentID))
-	if useCache {
-		req.UseRequest(clients.Cache)
-	}
-
-	return req.Send()
-}
-
 // GetFile gets an installed app's file as read closer
-func (cl *AppsClient) GetFile(account, workspace, app, parentID string, path string) (io.ReadCloser, string, error) {
-	res, err := cl.getFile(account, workspace, app, parentID, path, false)
+func (cl *AppsClient) GetFile(app, parentID string, path string) (*gentleman.Response, string, error) {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, app, path)).
+		Use(addParent(parentID)).Send()
 	if err != nil {
 		return nil, "", err
 	}
 
-	return res, res.(*gentleman.Response).Header.Get(clients.HeaderETag), nil
+	return res, res.Header.Get(clients.HeaderETag), nil
 }
 
-// GetFileB gets an installed app's file as bytes
-func (cl *AppsClient) GetFileB(account, workspace, app, parentID string, path string) ([]byte, string, error) {
-	const kind = "file-bytes"
-	res, err := cl.getFile(account, workspace, app, parentID, path, true)
+func (cl *AppsClient) GetDependencies() (map[string][]string, string, error) {
+	res, err := cl.http.Get().AddPath(pathToDependencies).Send()
 	if err != nil {
 		return nil, "", err
-	}
-
-	gentRes := res.(*gentleman.Response)
-	if cached, ok, err := cl.cache.GetFor(kind, gentRes); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.([]byte), gentRes.Header.Get(clients.HeaderETag), nil
-	}
-
-	bytes := gentRes.Bytes()
-	cl.cache.SetFor(kind, gentRes, bytes)
-
-	return bytes, gentRes.Header.Get(clients.HeaderETag), nil
-}
-
-// GetFileJ gets an installed app's file as deserialized JSON object
-func (cl *AppsClient) GetFileJ(account, workspace, app, parentID string, path string, dest interface{}) (string, error) {
-	b, eTag, err := cl.GetFileB(account, workspace, app, parentID, path)
-	if err != nil {
-		return "", err
-	}
-
-	err = json.Unmarshal(b, dest)
-	return eTag, err
-}
-
-func (cl *AppsClient) GetDependencies(account, workspace string) (map[string][]string, string, error) {
-	const kind = "dependencies"
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToDependencies, account, workspace)).
-		UseRequest(clients.Cache).Send()
-	if err != nil {
-		return nil, "", err
-	}
-
-	if cached, ok, err := cl.cache.GetFor(kind, res); err != nil {
-		return nil, "", err
-	} else if ok {
-		return cached.(map[string][]string), res.Header.Get(clients.HeaderETag), nil
 	}
 
 	var dependencies map[string][]string
@@ -161,7 +88,6 @@ func (cl *AppsClient) GetDependencies(account, workspace string) (map[string][]s
 		return nil, "", err
 	}
 
-	cl.cache.SetFor(kind, res, dependencies)
 	return dependencies, res.Header.Get(clients.HeaderETag), err
 }
 
