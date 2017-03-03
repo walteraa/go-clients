@@ -1,9 +1,7 @@
 package apps
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/vtex/go-clients/clients"
@@ -14,9 +12,7 @@ import (
 type Registry interface {
 	GetApp(id string) (*PublishedApp, string, error)
 	ListFiles(id string) (*FileList, string, error)
-	GetFile(id string, path string) (io.ReadCloser, string, error)
-	GetFileB(id string, path string) ([]byte, string, error)
-	GetFileJ(id string, path string, data interface{}) (string, error)
+	GetFile(id string, path string) (*gentleman.Response, string, error)
 }
 
 // Client is a struct that provides interaction with apps
@@ -79,44 +75,19 @@ func (cl *RegistryClient) ListFiles(id string) (*FileList, string, error) {
 	return &l, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *RegistryClient) getFile(id string, path string) (*gentleman.Response, error) {
+func (cl *RegistryClient) GetFile(id string, path string) (*gentleman.Response, string, error) {
 	segments, err := getSegments(id)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	req := cl.http.Get().
-		AddPath(fmt.Sprintf(fileContentPath, segments[0], segments[1], path))
-
-	return req.Send()
-}
-
-func (cl *RegistryClient) GetFile(id string, path string) (io.ReadCloser, string, error) {
-	res, err := cl.getFile(id, path)
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(fileContentPath, segments[0], segments[1], path)).Send()
 	if err != nil {
 		return nil, "", err
 	}
 
 	return res, res.Header.Get(clients.HeaderETag), nil
-}
-
-func (cl *RegistryClient) GetFileB(id string, path string) ([]byte, string, error) {
-	res, err := cl.getFile(id, path)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return res.Bytes(), res.Header.Get(clients.HeaderETag), nil
-}
-
-func (cl *RegistryClient) GetFileJ(id string, path string, data interface{}) (string, error) {
-	b, eTag, err := cl.GetFileB(id, path)
-	if err != nil {
-		return "", err
-	}
-
-	err = json.Unmarshal(b, data)
-	return eTag, err
 }
 
 func getSegments(id string) ([]string, error) {

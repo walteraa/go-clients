@@ -1,9 +1,7 @@
 package apps
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
@@ -15,9 +13,7 @@ import (
 type Apps interface {
 	GetApp(app, parentID string) (*ActiveApp, string, error)
 	ListFiles(app, parentID string) (*FileList, string, error)
-	GetFile(app, parentID string, path string) (io.ReadCloser, string, error)
-	GetFileB(app, parentID string, path string) ([]byte, string, error)
-	GetFileJ(app, parentID string, path string, dest interface{}) (string, error)
+	GetFile(app, parentID string, path string) (*gentleman.Response, string, error)
 	GetDependencies() (map[string][]string, string, error)
 }
 
@@ -70,42 +66,15 @@ func (cl *AppsClient) ListFiles(app, parentID string) (*FileList, string, error)
 	return &files, res.Header.Get(clients.HeaderETag), nil
 }
 
-func (cl *AppsClient) getFile(app, parentID string, path string) (*gentleman.Response, error) {
-	req := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, app, path)).
-		Use(addParent(parentID))
-
-	return req.Send()
-}
-
 // GetFile gets an installed app's file as read closer
-func (cl *AppsClient) GetFile(app, parentID string, path string) (io.ReadCloser, string, error) {
-	res, err := cl.getFile(app, parentID, path)
+func (cl *AppsClient) GetFile(app, parentID string, path string) (*gentleman.Response, string, error) {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, app, path)).
+		Use(addParent(parentID)).Send()
 	if err != nil {
 		return nil, "", err
 	}
 
 	return res, res.Header.Get(clients.HeaderETag), nil
-}
-
-// GetFileB gets an installed app's file as bytes
-func (cl *AppsClient) GetFileB(app, parentID string, path string) ([]byte, string, error) {
-	res, err := cl.getFile(app, parentID, path)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return res.Bytes(), res.Header.Get(clients.HeaderETag), nil
-}
-
-// GetFileJ gets an installed app's file as deserialized JSON object
-func (cl *AppsClient) GetFileJ(app, parentID string, path string, dest interface{}) (string, error) {
-	b, eTag, err := cl.GetFileB(app, parentID, path)
-	if err != nil {
-		return "", err
-	}
-
-	err = json.Unmarshal(b, dest)
-	return eTag, err
 }
 
 func (cl *AppsClient) GetDependencies() (map[string][]string, string, error) {

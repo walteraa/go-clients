@@ -8,18 +8,14 @@ import (
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
-	"net/http"
-	"io/ioutil"
 )
 
 // Workspaces is an interface for interacting with workspaces
 type VBase interface {
 	GetBucket(bucket string) (*BucketResponse, string, error)
 	SetBucketState(bucket, state string) (string, error)
-	GetFile(bucket, path string) (io.ReadCloser, string, error)
-	GetFileB(bucket, path string) ([]byte, http.Header, error)
-	GetFileConflict(bucket, path string) (io.ReadCloser, *Conflict, string, error)
-	GetFileConflictB(bucket, path string) ([]byte, *Conflict, string, error)
+	GetFile(bucket, path string) (*gentleman.Response, string, error)
+	GetFileConflict(bucket, path string) (*gentleman.Response, *Conflict, string, error)
 	SaveFile(bucket, path string, body io.Reader) (string, error)
 	SaveFileB(bucket, path string, content []byte, contentType string, unzip bool) (string, error)
 	ListFiles(bucket, prefix, marker string, size int) (*FileListResponse, string, error)
@@ -73,13 +69,9 @@ func (cl *Client) SetBucketState(bucket, state string) (string, error) {
 	return "", nil
 }
 
-func (cl *Client) getFile(bucket, path string) *gentleman.Request {
-	return cl.http.Get().AddPath(fmt.Sprintf(pathToFile, bucket, path))
-}
-
 // GetFile gets a file's content as a read closer
-func (cl *Client) GetFile(bucket, path string) (io.ReadCloser, string, error) {
-	res, err := cl.getFile(bucket, path).Send()
+func (cl *Client) GetFile(bucket, path string) (*gentleman.Response, string, error) {
+	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, bucket, path)).Send()
 	if err != nil {
 		return nil, res.Header.Get(clients.HeaderETag), err
 	}
@@ -87,17 +79,8 @@ func (cl *Client) GetFile(bucket, path string) (io.ReadCloser, string, error) {
 	return res, res.Header.Get(clients.HeaderETag), nil
 }
 
-// GetFileB gets a file's content as bytes
-func (cl *Client) GetFileB(bucket, path string) ([]byte, http.Header, error) {
-	res, err := cl.getFile(bucket, path).Send()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return res.Bytes(), res.Header.Get(clients.HeaderETag), nil
-}
-
-func (cl *Client) getFileConflict(bucket, path string) (*gentleman.Response, *Conflict, string, error) {
+// GetFileConflict gets a file's content as a byte slice, or conflict
+func (cl *Client) GetFileConflict(bucket, path string) (*gentleman.Response, *Conflict, string, error) {
 	req := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToFile, bucket, path)).
 		Use(headers.Set("x-conflict-resolution", "merge"))
@@ -115,25 +98,6 @@ func (cl *Client) getFileConflict(bucket, path string) (*gentleman.Response, *Co
 	}
 
 	return res, nil, res.Header.Get(clients.HeaderETag), nil
-}
-
-// GetFileConflict gets a file's content as a byte slice, or conflict
-func (cl *Client) GetFileConflict(bucket, path string) (io.ReadCloser, *Conflict, string, error) {
-	return cl.getFileConflict(bucket, path)
-}
-
-// GetFileConflictB gets a file's content as bytes or conflict
-func (cl *Client) GetFileConflictB(bucket, path string) ([]byte, *Conflict, string, error) {
-	res, conflict, eTag, err := cl.getFileConflict(bucket, path)
-	if err != nil {
-		return nil, nil, eTag, err
-	}
-
-	if conflict != nil {
-		return nil, conflict, eTag, nil
-	}
-
-	return res.Bytes(), nil, res.Header.Get(clients.HeaderETag), nil
 }
 
 // SaveFile saves a file to a workspace
