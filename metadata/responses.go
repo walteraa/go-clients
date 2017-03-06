@@ -7,10 +7,11 @@ type BucketResponse struct {
 }
 
 type MetadataListResponse struct {
-	Data []*MetadataResponse `json:"data"`
+	Data       []*MetadataResponseEntry `json:"data"`
+	NextMarker string                   `json:"next"`
 }
 
-type MetadataResponse struct {
+type MetadataResponseEntry struct {
 	Key   string          `json:"key"`
 	Hash  string          `json:"hash"`
 	Value json.RawMessage `json:"value"`

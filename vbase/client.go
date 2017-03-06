@@ -8,7 +8,14 @@ import (
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
+	"strconv"
 )
+
+type Options struct {
+	Prefix string
+	Marker string
+	Limit  int
+}
 
 // Workspaces is an interface for interacting with workspaces
 type VBase interface {
@@ -18,8 +25,8 @@ type VBase interface {
 	GetFileConflict(bucket, path string) (*gentleman.Response, *Conflict, string, error)
 	SaveFile(bucket, path string, body io.Reader) (string, error)
 	SaveFileB(bucket, path string, content []byte, contentType string, unzip bool) (string, error)
-	ListFiles(bucket, prefix, marker string, size int) (*FileListResponse, string, error)
-	ListAllFiles(bucket, prefix string, size int) (*FileListResponse, string, error)
+	ListFiles(bucket string, options *Options) (*FileListResponse, string, error)
+	ListAllFiles(bucket, prefix string) (*FileListResponse, string, error)
 	DeleteFile(bucket, path string) error
 }
 
@@ -124,16 +131,17 @@ func (cl *Client) SaveFileB(bucket, path string, body []byte, contentType string
 }
 
 // ListFiles returns a list of files, given a prefix
-func (cl *Client) ListFiles(bucket, prefix, marker string, size int) (*FileListResponse, string, error) {
-	if size <= 0 {
-		size = 100
+func (cl *Client) ListFiles(bucket string, options *Options) (*FileListResponse, string, error) {
+	if options.Limit <= 0 {
+		options.Limit = 10
 	}
+
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(pathToFileList, bucket)).
 		SetQueryParams(map[string]string{
-			"prefix": prefix,
-			"_next":  marker,
-			"_limit": fmt.Sprintf("%d", size),
+			"prefix": options.Prefix,
+			"_next":  options.Marker,
+			"_limit": strconv.Itoa(options.Limit),
 		}).Send()
 
 	if err != nil {
@@ -149,31 +157,33 @@ func (cl *Client) ListFiles(bucket, prefix, marker string, size int) (*FileListR
 }
 
 // ListAllFiles returns a complete list of files, given a prefix
-func (cl *Client) ListAllFiles(bucket, prefix string, size int) (*FileListResponse, string, error) {
-	partialList, eTag, err := cl.ListFiles(bucket, prefix, "", size)
+func (cl *Client) ListAllFiles(bucket, prefix string) (*FileListResponse, string, error) {
+	options := &Options{
+		Limit:  100,
+		Prefix: prefix,
+	}
+
+	list, eTag, err := cl.ListFiles(bucket, options)
 	if err != nil {
 		return nil, "", err
 	}
 
 	for {
-		if partialList.NextMarker == "" {
+		if list.NextMarker == "" {
 			break
 		}
+		options.Marker = list.NextMarker
 
-		newPartialList, newETag, err := cl.ListFiles(bucket, prefix, partialList.NextMarker, size)
+		partialList, newETag, err := cl.ListFiles(bucket, options)
 		if err != nil {
 			return nil, "", err
 		}
 
-		for _, v := range newPartialList.Files {
-			partialList.Files = append(partialList.Files, v)
-		}
-
-		partialList.NextMarker = newPartialList.NextMarker
+		list.Files = append(list.Files, partialList.Files...)
+		list.NextMarker = partialList.NextMarker
 		eTag = newETag
 	}
-
-	return partialList, eTag, nil
+	return list, eTag, nil
 }
 
 // DeleteFile deletes a file from the workspace

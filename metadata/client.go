@@ -8,10 +8,17 @@ import (
 	"strconv"
 )
 
+type Options struct {
+	IncludeValue bool
+	Limit        int
+	Marker       string
+}
+
 type Metadata interface {
 	GetBucket(bucket string) (*BucketResponse, string, error)
 	SetBucketState(bucket, state string) error
-	List(bucket string, includeValue bool, limit int) (*MetadataListResponse, string, error)
+	List(bucket string, options *Options) (*MetadataListResponse, string, error)
+	ListAll(bucket string, includeValue bool) (*MetadataListResponse, string, error)
 	Get(bucket, key string, data interface{}) (string, error)
 	Save(bucket, key string, data interface{}) (string, error)
 	Delete(bucket, key string) (bool, error)
@@ -58,14 +65,19 @@ func (cl *Client) SetBucketState(bucket, state string) error {
 	return nil
 }
 
-func (cl *Client) List(bucket string, includeValue bool, limit int) (*MetadataListResponse, string, error) {
-	req := cl.http.Get().AddPath(fmt.Sprintf(metadataPath, bucket))
-	req = req.SetQuery("_limit", strconv.Itoa(limit))
-	if includeValue {
-		req = req.SetQuery("value", "true")
+func (cl *Client) List(bucket string, options *Options) (*MetadataListResponse, string, error) {
+	if options.Limit <= 0 {
+		options.Limit = 10
 	}
 
-	res, err := req.Send()
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(metadataPath, bucket)).
+		SetQueryParams(map[string]string{
+			"value":   strconv.FormatBool(options.IncludeValue),
+			"_limit":  strconv.Itoa(options.Limit),
+			"_marker": options.Marker,
+		}).Send()
+
 	if err != nil {
 		return nil, "", err
 	}
@@ -75,7 +87,36 @@ func (cl *Client) List(bucket string, includeValue bool, limit int) (*MetadataLi
 		return nil, "", err
 	}
 
-	return &metadata, res.Header.Get("ETag"), nil
+	return &metadata, res.Header.Get(clients.HeaderETag), nil
+}
+
+func (cl *Client) ListAll(bucket string, includeValue bool) (*MetadataListResponse, string, error) {
+	options := &Options{
+		Limit:        100,
+		IncludeValue: includeValue,
+	}
+
+	list, eTag, err := cl.List(bucket, options)
+	if err != nil {
+		return nil, "", err
+	}
+
+	for {
+		if list.NextMarker == "" {
+			break
+		}
+		options.Marker = list.NextMarker
+
+		partialList, newETag, err := cl.List(bucket, options)
+		if err != nil {
+			return nil, "", err
+		}
+
+		list.Data = append(list.Data, partialList.Data...)
+		list.NextMarker = partialList.NextMarker
+		eTag = newETag
+	}
+	return list, eTag, nil
 }
 
 func (cl *Client) Get(bucket, key string, data interface{}) (string, error) {
