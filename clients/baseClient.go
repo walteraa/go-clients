@@ -45,7 +45,8 @@ func CreateClient(service string, config *Config, workspaceBound bool) *gentlema
 	}
 
 	cl := gentleman.New().
-		BaseURL(baseURL(service, config, workspaceBound)).
+		BaseURL(endpoint(service, config)).
+		Path(basePath(service, config, workspaceBound)).
 		Use(timeout.Request(config.Timeout)).
 		Use(headers.Set("Authorization", "token "+config.AuthToken)).
 		Use(headers.Set("User-Agent", config.UserAgent)).
@@ -142,17 +143,18 @@ func newCallTree(req *http.Request, res *http.Response, start time.Time) *CallTr
 	}
 }
 
-func baseURL(service string, config *Config, workspaceBound bool) string {
-	endpoint := config.Endpoint
-	if endpoint != "" {
-		endpoint = "http://" + strings.TrimRight(endpoint, "/")
-	} else {
-		endpoint = fmt.Sprintf("http://%s.%s.vtex.io", service, config.Region)
+func endpoint(service string, config *Config) string {
+	if config.Endpoint != "" {
+		return "http://" + strings.TrimRight(config.Endpoint, "/")
 	}
 
+	return fmt.Sprintf("http://%s.%s.vtex.io", service, config.Region)
+}
+
+func basePath(service string, config *Config, workspaceBound bool) string {
 	if workspaceBound {
-		return endpoint + "/" + config.Account + "/" + config.Workspace
+		return "/" + config.Account + "/" + config.Workspace
 	}
 
-	return endpoint
+	return ""
 }
