@@ -15,6 +15,7 @@ import (
 	"gopkg.in/h2non/gentleman.v1/plugin"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
 	"gopkg.in/h2non/gentleman.v1/plugins/timeout"
+	"gopkg.in/h2non/gentleman.v1/plugins/transport"
 )
 
 const HeaderETag = "ETag"
@@ -55,7 +56,7 @@ func CreateClient(service string, config *Config, workspaceBound bool) *gentlema
 		Use(traceRequest(config.RequestContext))
 
 	if config.Transport != nil {
-		cl.Context.Client.Transport = config.Transport
+		cl = cl.Use(transport.Set(config.Transport))
 	}
 
 	return cl
