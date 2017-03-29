@@ -126,6 +126,7 @@ func traceRequest(reqCtx RequestContext) plugin.Plugin {
 type CallTree struct {
 	Call     string      `json:"call"`
 	Status   int         `json:"status"`
+	Cache    string      `json:"cache"`
 	Time     int64       `json:"time"`
 	Children []*CallTree `json:"children,omitempty"`
 }
@@ -136,10 +137,17 @@ func newCallTree(req *http.Request, res *http.Response, start time.Time) *CallTr
 	if err := json.Unmarshal([]byte(resh), &children); err != nil && resh != "" {
 		logrus.WithError(err).Error("Failed to unmarshal call trace")
 	}
+
+	cache := "miss"
+	if _, ok := res.Header["X-From-Cache"]; ok {
+		cache = "hit"
+	}
+
 	return &CallTree{
 		Call:     req.Method + " " + req.URL.String(),
 		Time:     time.Now().Sub(start).Nanoseconds() / int64(time.Millisecond),
 		Status:   res.StatusCode,
+		Cache:    cache,
 		Children: children,
 	}
 }
