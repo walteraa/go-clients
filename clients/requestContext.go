@@ -20,18 +20,19 @@ type RequestContext interface {
 }
 
 func NewRequestContext(parent *http.Request) RequestContext {
+	headers := map[string][]string{}
 	enableTrace := false
+
 	if parent != nil {
 		enableTrace = parent.Header.Get(enableTraceHeader) == "true"
-	}
 
-	headers := map[string][]string{}
-	if enableTrace {
-		headers[enableTraceHeader] = []string{"true"}
-	}
+		if enableTrace {
+			headers[enableTraceHeader] = []string{"true"}
+		}
 
-	if credential := parent.Header.Get(credentialHeader); credential != "" {
-		headers["Authorization"] = []string{"bearer " + credential}
+		if credential := parent.Header.Get(credentialHeader); credential != "" {
+			headers["Authorization"] = []string{"bearer " + credential}
+		}
 	}
 
 	return &requestContext{
