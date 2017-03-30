@@ -9,6 +9,7 @@ const (
 	metadataHeader    = "X-Vtex-Meta"
 	enableTraceHeader = "X-Vtex-Trace-Enable"
 	traceHeader       = "X-Call-Trace"
+	credentialHeader  = "X-Vtex-Credential"
 )
 
 type RequestContext interface {
@@ -28,6 +29,11 @@ func NewRequestContext(parent *http.Request) RequestContext {
 	if enableTrace {
 		headers[enableTraceHeader] = []string{"true"}
 	}
+
+	if credential := parent.Header.Get(credentialHeader); credential != "" {
+		headers["Authorization"] = []string{"bearer " + credential}
+	}
+
 	return &requestContext{
 		headers:           headers,
 		enableTraceHeader: enableTrace,
