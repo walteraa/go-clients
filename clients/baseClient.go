@@ -49,7 +49,6 @@ func CreateClient(service string, config *Config, workspaceBound bool) *gentlema
 		BaseURL(endpoint(service, config)).
 		Path(basePath(service, config, workspaceBound)).
 		Use(timeout.Request(config.Timeout)).
-		Use(headers.Set("Authorization", "token "+config.AuthToken)).
 		Use(headers.Set("User-Agent", config.UserAgent)).
 		Use(responseErrors()).
 		Use(recordHeaders(config.RequestContext)).
