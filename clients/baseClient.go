@@ -13,6 +13,7 @@ import (
 	"gopkg.in/h2non/gentleman.v1"
 	"gopkg.in/h2non/gentleman.v1/context"
 	"gopkg.in/h2non/gentleman.v1/plugin"
+	"gopkg.in/h2non/gentleman.v1/plugins/auth"
 	"gopkg.in/h2non/gentleman.v1/plugins/headers"
 	"gopkg.in/h2non/gentleman.v1/plugins/timeout"
 	"gopkg.in/h2non/gentleman.v1/plugins/transport"
@@ -53,6 +54,10 @@ func CreateClient(service string, config *Config, workspaceBound bool) *gentlema
 		Use(responseErrors()).
 		Use(recordHeaders(config.RequestContext)).
 		Use(traceRequest(config.RequestContext))
+
+	if config.AuthToken != "" {
+		cl = cl.Use(auth.Bearer(config.AuthToken))
+	}
 
 	if config.Transport != nil {
 		cl = cl.Use(transport.Set(config.Transport))
