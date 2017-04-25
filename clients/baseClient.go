@@ -74,7 +74,7 @@ func responseErrors() plugin.Plugin {
 
 		if buf, err = ioutil.ReadAll(c.Response.Body); err != nil {
 			descr = ErrorDescriptor{Code: "undefined"}
-		} else if err = json.Unmarshal(buf, &descr); err == nil {
+		} else if err = json.Unmarshal(buf, &descr); err != nil || descr.Code == "" || descr.Message == "" {
 			descr = ErrorDescriptor{Code: "undefined", Message: string(buf)}
 		}
 
