@@ -27,6 +27,7 @@ type Config struct {
 	Region         string
 	Endpoint       string
 	AuthToken      string
+	AuthFunc       func() string
 	UserAgent      string
 	RequestContext RequestContext
 	Timeout        time.Duration
@@ -57,6 +58,10 @@ func CreateClient(service string, config *Config, workspaceBound bool) *gentlema
 
 	if config.AuthToken != "" {
 		cl = cl.Use(auth.Bearer(config.AuthToken))
+	} else if config.AuthFunc != nil {
+		cl = cl.UseRequest(func(ctx *context.Context, h context.Handler) {
+			ctx.Request.Header.Set("Authorization", "Bearer "+config.AuthFunc())
+		})
 	}
 
 	if config.Transport != nil {
