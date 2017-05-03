@@ -3,9 +3,10 @@ package metadata
 import (
 	"fmt"
 
+	"strconv"
+
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
-	"strconv"
 )
 
 type Options struct {
@@ -21,6 +22,7 @@ type Metadata interface {
 	ListAll(bucket string, includeValue bool) (*MetadataListResponse, string, error)
 	Get(bucket, key string, data interface{}) (string, error)
 	Save(bucket, key string, data interface{}) (string, error)
+	SaveAll(bucket string, data map[string]interface{}) (string, error)
 	Delete(bucket, key string) (bool, error)
 }
 
@@ -136,6 +138,18 @@ func (cl *Client) Get(bucket, key string, data interface{}) (string, error) {
 func (cl *Client) Save(bucket, key string, data interface{}) (string, error) {
 	res, err := cl.http.Put().
 		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).
+		JSON(data).Send()
+
+	if err != nil {
+		return "", err
+	}
+
+	return res.Header.Get("ETag"), nil
+}
+
+func (cl *Client) SaveAll(bucket string, data map[string]interface{}) (string, error) {
+	res, err := cl.http.Put().
+		AddPath(fmt.Sprintf(metadataPath, bucket)).
 		JSON(data).Send()
 
 	if err != nil {
