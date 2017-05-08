@@ -67,6 +67,7 @@ func CreateClient(service string, config *Config, workspaceBound bool) *gentlema
 	} else if config.AuthFunc != nil {
 		cl = cl.UseRequest(func(ctx *context.Context, h context.Handler) {
 			ctx.Request.Header.Set("Authorization", "Bearer "+config.AuthFunc())
+			h.Next(ctx)
 		})
 	}
 
