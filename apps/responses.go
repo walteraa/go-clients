@@ -22,21 +22,22 @@ type DependencyTree map[string]DependencyTree
 
 // ActiveApp represents an active app's metadata
 type ActiveApp struct {
-	Vendor           string            `json:"vendor"`
-	Name             string            `json:"name"`
-	Version          string            `json:"version"`
-	Title            string            `json:"title"`
-	Description      string            `json:"description"`
-	Categories       []string          `json:"categories"`
-	Dependencies     map[string]string `json:"dependencies"`
-	PeerDependencies map[string]string `json:"peerDependencies"`
-	SettingsSchema   interface{}       `json:"settingsSchema"`
-	ID               string            `json:"_id"`
-	DependencyTree   DependencyTree    `json:"_dependencyTree"`
-	DependencySet    []string          `json:"_dependencySet"`
-	ActivationDate   string            `json:"_activationDate"`
-	Link             string            `json:"_link,omitempty"`
-	Registry         string            `json:"_registry,omitempty"`
+	Vendor               string            `json:"vendor"`
+	Name                 string            `json:"name"`
+	Version              string            `json:"version"`
+	Title                string            `json:"title"`
+	Description          string            `json:"description"`
+	Categories           []string          `json:"categories"`
+	Dependencies         map[string]string `json:"dependencies"`
+	PeerDependencies     map[string]string `json:"peerDependencies"`
+	SettingsSchema       interface{}       `json:"settingsSchema"`
+	ID                   string            `json:"_id"`
+	DependencyTree       DependencyTree    `json:"_dependencyTree"`
+	DependencySet        []string          `json:"_dependencySet"`
+	ActivationDate       string            `json:"_activationDate"`
+	Link                 string            `json:"_link,omitempty"`
+	Registry             string            `json:"_registry,omitempty"`
+	ResolvedDependencies map[string]string `json:"_resolvedDependencies"`
 }
 
 // PublishedApp represents a published app's metadata
