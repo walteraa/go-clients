@@ -31,6 +31,7 @@ type ActiveApp struct {
 	Dependencies         map[string]string `json:"dependencies"`
 	PeerDependencies     map[string]string `json:"peerDependencies"`
 	SettingsSchema       interface{}       `json:"settingsSchema"`
+	CredentialType       string            `json:"credentialType"`
 	ID                   string            `json:"_id"`
 	DependencyTree       DependencyTree    `json:"_dependencyTree"`
 	DependencySet        []string          `json:"_dependencySet"`
@@ -51,6 +52,7 @@ type PublishedApp struct {
 	Dependencies     map[string]string `json:"dependencies"`
 	PeerDependencies map[string]string `json:"peerDependencies"`
 	SettingsSchema   interface{}       `json:"settingsSchema"`
+	CredentialType   string            `json:"credentialType"`
 	ID               string            `json:"_id"`
 	Publisher        string            `json:"_publisher"`
 	PublicationDate  string            `json:"_publicationDate"`
