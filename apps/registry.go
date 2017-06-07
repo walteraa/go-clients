@@ -22,7 +22,11 @@ type RegistryClient struct {
 
 // NewClient creates a new Registry client
 func NewRegistryClient(config *clients.Config) Registry {
-	config.Workspace = "master"
+	if config.Workspace != "master" {
+		configCopy := *config
+		configCopy.Workspace = "master"
+		config = &configCopy
+	}
 	cl := clients.CreateClient("apps", config, true)
 	return &RegistryClient{cl}
 }
