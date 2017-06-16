@@ -2,6 +2,7 @@ package apps
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
@@ -13,7 +14,8 @@ import (
 type Apps interface {
 	GetApp(app, parentID string) (*ActiveApp, string, error)
 	ListFiles(app, parentID string) (*FileList, string, error)
-	GetFile(app, parentID string, path string) (*gentleman.Response, string, error)
+	GetFile(app, parentID, path string) (*gentleman.Response, string, error)
+	GetBundle(app, parentID, rootFolder string) (io.Reader, string, error)
 	GetDependencies() (map[string][]string, string, error)
 }
 
@@ -33,12 +35,15 @@ const (
 	pathToApp          = "/apps/%v"
 	pathToFiles        = "/apps/%v/files"
 	pathToFile         = "/apps/%v/files/%v"
+	pathToBundle       = "/apps/%v/bundle/%v"
 )
 
 // GetApp describes an installed app's manifest
 func (cl *AppsClient) GetApp(app, parentID string) (*ActiveApp, string, error) {
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToApp, app)).
-		Use(addParent(parentID)).Send()
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(pathToApp, app)).
+		Use(addParent(parentID)).
+		Send()
 	if err != nil {
 		return nil, "", err
 	}
@@ -52,8 +57,10 @@ func (cl *AppsClient) GetApp(app, parentID string) (*ActiveApp, string, error) {
 }
 
 func (cl *AppsClient) ListFiles(app, parentID string) (*FileList, string, error) {
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFiles, app)).
-		Use(addParent(parentID)).Send()
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(pathToFiles, app)).
+		Use(addParent(parentID)).
+		Send()
 	if err != nil {
 		return nil, "", err
 	}
@@ -68,8 +75,22 @@ func (cl *AppsClient) ListFiles(app, parentID string) (*FileList, string, error)
 
 // GetFile gets an installed app's file as read closer
 func (cl *AppsClient) GetFile(app, parentID string, path string) (*gentleman.Response, string, error) {
-	res, err := cl.http.Get().AddPath(fmt.Sprintf(pathToFile, app, path)).
-		Use(addParent(parentID)).Send()
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(pathToFile, app, path)).
+		Use(addParent(parentID)).
+		Send()
+	if err != nil {
+		return nil, "", err
+	}
+
+	return res, res.Header.Get(clients.HeaderETag), nil
+}
+
+func (cl *AppsClient) GetBundle(app, parentID, rootFolder string) (io.Reader, string, error) {
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(pathToBundle, app, rootFolder)).
+		Use(addParent(parentID)).
+		Send()
 	if err != nil {
 		return nil, "", err
 	}
@@ -78,7 +99,9 @@ func (cl *AppsClient) GetFile(app, parentID string, path string) (*gentleman.Res
 }
 
 func (cl *AppsClient) GetDependencies() (map[string][]string, string, error) {
-	res, err := cl.http.Get().AddPath(pathToDependencies).Send()
+	res, err := cl.http.Get().
+		AddPath(pathToDependencies).
+		Send()
 	if err != nil {
 		return nil, "", err
 	}
