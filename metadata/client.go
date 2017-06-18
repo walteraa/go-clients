@@ -6,6 +6,10 @@ import (
 
 	"strconv"
 
+	"sync"
+
+	"strings"
+
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 )
@@ -26,6 +30,7 @@ type Metadata interface {
 	Get(bucket, key string, data interface{}) (string, error)
 	Save(bucket, key string, data interface{}) (string, error)
 	SaveAll(bucket string, data map[string]interface{}) (string, error)
+	DoAll(bucket string, path MetadataPatchRequest) error
 	Delete(bucket, key string) (bool, error)
 	ListConflicts(bucket string) (MetadataConflictMap, error)
 }
@@ -172,6 +177,51 @@ func (cl *Client) SaveAll(bucket string, data map[string]interface{}) (string, e
 	}
 
 	return res.Header.Get("ETag"), nil
+}
+
+func (cl *Client) DoAll(bucket string, patch MetadataPatchRequest) error {
+	toSave := map[string]interface{}{}
+	// not to block goroutines, assume at most one error per operation
+	errs := make(chan error, len(patch))
+
+	wg := sync.WaitGroup{}
+	for _, op := range patch {
+		switch op.Operation {
+		case SaveOperation:
+			toSave[op.Key] = op.Value
+		case DeleteOperation:
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, err := cl.Delete(bucket, op.Key)
+				if err != nil {
+					errs <- err
+				}
+			}()
+		}
+	}
+
+	if len(toSave) > 0 {
+		_, err := cl.SaveAll(bucket, toSave)
+		if err != nil {
+			errs <- err
+		}
+	}
+
+	wg.Wait()
+	close(errs)
+
+	errCount := len(errs)
+	if errCount > 0 {
+		errMsgs := make([]string, 0, errCount)
+		for err := range errs {
+			errMsgs = append(errMsgs, err.Error())
+		}
+
+		return fmt.Errorf("Error(s) in metadata patch: %s", strings.Join(errMsgs, "; "))
+	}
+
+	return nil
 }
 
 func (cl *Client) Delete(bucket, key string) (bool, error) {
