@@ -16,3 +16,11 @@ type MetadataResponseEntry struct {
 	Hash  string          `json:"hash"`
 	Value json.RawMessage `json:"value"`
 }
+
+type MetadataConflictMap map[string]*MetadataConflict
+
+type MetadataConflict struct {
+	Master json.RawMessage `json:"master"`
+	Base   json.RawMessage `json:"base"`
+	Mine   json.RawMessage `json:"mine"`
+}

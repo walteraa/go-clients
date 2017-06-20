@@ -24,6 +24,7 @@ type Metadata interface {
 	Save(bucket, key string, data interface{}) (string, error)
 	SaveAll(bucket string, data map[string]interface{}) (string, error)
 	Delete(bucket, key string) (bool, error)
+	ListConflicts(bucket string) (MetadataConflictMap, error)
 }
 
 type Client struct {
@@ -38,6 +39,7 @@ func NewClient(config *clients.Config) Metadata {
 const (
 	bucketPath      = "/buckets/%v"
 	bucketStatePath = "/buckets/%v/state"
+	conflictsPath   = "/buckets/%v/conflicts"
 	metadataPath    = "/buckets/%v/metadata"
 	metadataKeyPath = "/buckets/%v/metadata/%v"
 )
@@ -171,4 +173,20 @@ func (cl *Client) Delete(bucket, key string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (cl *Client) ListConflicts(bucket string) (MetadataConflictMap, error) {
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(conflictsPath, bucket)).
+		Send()
+	if err != nil {
+		return nil, err
+	}
+
+	var conflicts map[string]*MetadataConflict
+	if err := res.JSON(&conflicts); err != nil {
+		return nil, fmt.Errorf("Error unmarshaling metadata conflicts: %v", err)
+	}
+
+	return conflicts, nil
 }
