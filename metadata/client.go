@@ -2,12 +2,15 @@ package metadata
 
 import (
 	"fmt"
+	"net/http"
 
 	"strconv"
 
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 )
+
+const detectConflictsHeader = "X-Vtex-Detect-Conflicts"
 
 type Options struct {
 	IncludeValue bool
@@ -27,13 +30,21 @@ type Metadata interface {
 	ListConflicts(bucket string) (MetadataConflictMap, error)
 }
 
-type Client struct {
-	http *gentleman.Client
+type ConflictResolver interface {
+	Resolve(client Metadata, bucketDetected string) (resolved bool, err error)
 }
 
-func NewClient(config *clients.Config) Metadata {
+type Client struct {
+	http             *gentleman.Client
+	conflictResolver ConflictResolver
+}
+
+// NewClient creates a Metadata client with specified configuration. Conflict
+// resolver is optional but if set, will be called for each detected conflict in
+// metadata access methods to attempt a resolution logic.
+func NewClient(config *clients.Config, resolver ConflictResolver) Metadata {
 	cl := clients.CreateClient("kube-router", config, true)
-	return &Client{cl}
+	return &Client{cl, resolver}
 }
 
 const (
@@ -74,13 +85,14 @@ func (cl *Client) List(bucket string, options *Options) (*MetadataListResponse, 
 		options.Limit = 10
 	}
 
-	res, err := cl.http.Get().
+	req := cl.http.Get().
 		AddPath(fmt.Sprintf(metadataPath, bucket)).
 		SetQueryParams(map[string]string{
 			"value":   strconv.FormatBool(options.IncludeValue),
 			"_limit":  strconv.Itoa(options.Limit),
 			"_marker": options.Marker,
-		}).Send()
+		})
+	res, err := cl.performConflictResolved(bucket, req)
 
 	if err != nil {
 		return nil, "", err
@@ -124,8 +136,9 @@ func (cl *Client) ListAll(bucket string, includeValue bool) (*MetadataListRespon
 }
 
 func (cl *Client) Get(bucket, key string, data interface{}) (string, error) {
-	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).Send()
+	req := cl.http.Get().
+		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key))
+	res, err := cl.performConflictResolved(bucket, req)
 	if err != nil {
 		return "", err
 	}
@@ -166,7 +179,7 @@ func (cl *Client) Delete(bucket, key string) (bool, error) {
 		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).Send()
 
 	if err != nil {
-		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == 404 {
+		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == http.StatusNotFound {
 			return false, nil
 		}
 		return false, err
@@ -189,4 +202,37 @@ func (cl *Client) ListConflicts(bucket string) (MetadataConflictMap, error) {
 	}
 
 	return conflicts, nil
+}
+
+func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request) (*gentleman.Response, error) {
+	if cl.conflictResolver == nil {
+		return req.Send()
+	}
+	req.SetHeader(detectConflictsHeader, "true")
+
+	for {
+		res, err := req.Send()
+
+		if isConflict(err) {
+			resolved, resolveErr := cl.conflictResolver.Resolve(cl, bucket)
+			if resolveErr != nil {
+				return nil, fmt.Errorf("Error resolving conflicts: %v", err)
+			} else if !resolved {
+				return nil, fmt.Errorf("Failed to resolve metadata conflicts found in bucket %s", bucket)
+			}
+
+			// Retry the request after conflicts resolved
+			req = req.Clone()
+			continue
+		}
+
+		return res, err
+	}
+}
+
+func isConflict(err error) bool {
+	if respErr, ok := err.(clients.ResponseError); ok && respErr.StatusCode != http.StatusConflict {
+		return true
+	}
+	return false
 }
