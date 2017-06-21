@@ -3,6 +3,7 @@ package clients
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type ResponseError struct {
@@ -13,5 +14,9 @@ type ResponseError struct {
 }
 
 func (err ResponseError) Error() string {
-	return fmt.Sprintf("(%d %v at %v) %v", err.StatusCode, err.Code, err.Response.Request.URL, err.Message)
+	var url *url.URL
+	if err.Response != nil && err.Response.Request != nil {
+		url = err.Response.Request.URL
+	}
+	return fmt.Sprintf("(%d %v at %v) %v", err.StatusCode, err.Code, url, err.Message)
 }
