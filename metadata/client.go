@@ -32,7 +32,7 @@ type Metadata interface {
 	SaveAll(bucket string, data map[string]interface{}) (string, error)
 	DoAll(bucket string, path MetadataPatchRequest) error
 	Delete(bucket, key string) (bool, error)
-	ListConflicts(bucket string) (MetadataConflictMap, error)
+	ListConflicts(bucket string) ([]*MetadataConflict, error)
 }
 
 type ConflictResolver interface {
@@ -186,16 +186,16 @@ func (cl *Client) DoAll(bucket string, patch MetadataPatchRequest) error {
 
 	wg := sync.WaitGroup{}
 	for _, op := range patch {
-		switch op.Operation {
-		case SaveOperation:
+		switch op.Type {
+		case OperationTypeSave:
 			toSave[op.Key] = op.Value
-		case DeleteOperation:
+		case OperationTypeDelete:
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				_, err := cl.Delete(bucket, op.Key)
 				if err != nil {
-					errs <- err
+					errs <- fmt.Errorf("Delete %s: %v", op.Key, err)
 				}
 			}()
 		}
@@ -204,7 +204,7 @@ func (cl *Client) DoAll(bucket string, patch MetadataPatchRequest) error {
 	if len(toSave) > 0 {
 		_, err := cl.SaveAll(bucket, toSave)
 		if err != nil {
-			errs <- err
+			errs <- fmt.Errorf("Save keys %v: %v", mapKeys(toSave), err)
 		}
 	}
 
@@ -218,7 +218,7 @@ func (cl *Client) DoAll(bucket string, patch MetadataPatchRequest) error {
 			errMsgs = append(errMsgs, err.Error())
 		}
 
-		return fmt.Errorf("Error(s) in metadata patch: %s", strings.Join(errMsgs, "; "))
+		return fmt.Errorf("Error(s) in metadata patch in bucket %s: %s", bucket, strings.Join(errMsgs, "; "))
 	}
 
 	return nil
@@ -238,7 +238,7 @@ func (cl *Client) Delete(bucket, key string) (bool, error) {
 	return true, nil
 }
 
-func (cl *Client) ListConflicts(bucket string) (MetadataConflictMap, error) {
+func (cl *Client) ListConflicts(bucket string) ([]*MetadataConflict, error) {
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(conflictsPath, bucket)).
 		Send()
@@ -246,7 +246,7 @@ func (cl *Client) ListConflicts(bucket string) (MetadataConflictMap, error) {
 		return nil, err
 	}
 
-	var conflicts map[string]*MetadataConflict
+	var conflicts []*MetadataConflict
 	if err := res.JSON(&conflicts); err != nil {
 		return nil, fmt.Errorf("Error unmarshaling metadata conflicts: %v", err)
 	}
@@ -285,4 +285,12 @@ func isConflict(err error) bool {
 		return true
 	}
 	return false
+}
+
+func mapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
