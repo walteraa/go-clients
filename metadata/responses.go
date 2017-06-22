@@ -17,6 +17,10 @@ type MetadataResponseEntry struct {
 	Value json.RawMessage `json:"value"`
 }
 
+type MetadataConflictListResponse struct {
+	Data []*MetadataConflict `json:"data"`
+}
+
 type MetadataConflict struct {
 	Key    string                  `json:"key"`
 	Values *MetadataConflictValues `json:"values"`

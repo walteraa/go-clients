@@ -32,7 +32,7 @@ type Metadata interface {
 	SaveAll(bucket string, data map[string]interface{}) (string, error)
 	DoAll(bucket string, path MetadataPatchRequest) error
 	Delete(bucket, key string) (bool, error)
-	ListConflicts(bucket string) ([]*MetadataConflict, error)
+	ListAllConflicts(bucket string) ([]*MetadataConflict, error)
 }
 
 type ConflictResolver interface {
@@ -238,7 +238,7 @@ func (cl *Client) Delete(bucket, key string) (bool, error) {
 	return true, nil
 }
 
-func (cl *Client) ListConflicts(bucket string) ([]*MetadataConflict, error) {
+func (cl *Client) ListAllConflicts(bucket string) ([]*MetadataConflict, error) {
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(conflictsPath, bucket)).
 		Send()
@@ -246,12 +246,12 @@ func (cl *Client) ListConflicts(bucket string) ([]*MetadataConflict, error) {
 		return nil, err
 	}
 
-	var conflicts []*MetadataConflict
-	if err := res.JSON(&conflicts); err != nil {
+	var response MetadataConflictListResponse
+	if err := res.JSON(&response); err != nil {
 		return nil, fmt.Errorf("Error unmarshaling metadata conflicts: %v", err)
 	}
 
-	return conflicts, nil
+	return response.Data, nil
 }
 
 func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request) (*gentleman.Response, error) {
