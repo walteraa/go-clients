@@ -2,12 +2,19 @@ package metadata
 
 import (
 	"fmt"
+	"net/http"
 
 	"strconv"
+
+	"sync"
+
+	"strings"
 
 	"github.com/vtex/go-clients/clients"
 	"gopkg.in/h2non/gentleman.v1"
 )
+
+const detectConflictsHeader = "X-Vtex-Detect-Conflicts"
 
 type Options struct {
 	IncludeValue bool
@@ -23,21 +30,32 @@ type Metadata interface {
 	Get(bucket, key string, data interface{}) (string, error)
 	Save(bucket, key string, data interface{}) (string, error)
 	SaveAll(bucket string, data map[string]interface{}) (string, error)
+	DoAll(bucket string, path MetadataPatchRequest) error
 	Delete(bucket, key string) (bool, error)
+	ListAllConflicts(bucket string) ([]*MetadataConflict, error)
+}
+
+type ConflictResolver interface {
+	Resolve(client Metadata, bucketDetected string) (resolved bool, err error)
 }
 
 type Client struct {
-	http *gentleman.Client
+	http             *gentleman.Client
+	conflictResolver ConflictResolver
 }
 
-func NewClient(config *clients.Config) Metadata {
+// NewClient creates a Metadata client with specified configuration. Conflict
+// resolver is optional but if set, will be called for each detected conflict in
+// metadata access methods to attempt a resolution logic.
+func NewClient(config *clients.Config, resolver ConflictResolver) Metadata {
 	cl := clients.CreateClient("kube-router", config, true)
-	return &Client{cl}
+	return &Client{cl, resolver}
 }
 
 const (
 	bucketPath      = "/buckets/%v"
 	bucketStatePath = "/buckets/%v/state"
+	conflictsPath   = "/buckets/%v/conflicts"
 	metadataPath    = "/buckets/%v/metadata"
 	metadataKeyPath = "/buckets/%v/metadata/%v"
 )
@@ -72,13 +90,14 @@ func (cl *Client) List(bucket string, options *Options) (*MetadataListResponse, 
 		options.Limit = 10
 	}
 
-	res, err := cl.http.Get().
+	req := cl.http.Get().
 		AddPath(fmt.Sprintf(metadataPath, bucket)).
 		SetQueryParams(map[string]string{
 			"value":   strconv.FormatBool(options.IncludeValue),
 			"_limit":  strconv.Itoa(options.Limit),
 			"_marker": options.Marker,
-		}).Send()
+		})
+	res, err := cl.performConflictResolved(bucket, req)
 
 	if err != nil {
 		return nil, "", err
@@ -122,8 +141,9 @@ func (cl *Client) ListAll(bucket string, includeValue bool) (*MetadataListRespon
 }
 
 func (cl *Client) Get(bucket, key string, data interface{}) (string, error) {
-	res, err := cl.http.Get().
-		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).Send()
+	req := cl.http.Get().
+		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key))
+	res, err := cl.performConflictResolved(bucket, req)
 	if err != nil {
 		return "", err
 	}
@@ -159,16 +179,118 @@ func (cl *Client) SaveAll(bucket string, data map[string]interface{}) (string, e
 	return res.Header.Get("ETag"), nil
 }
 
+func (cl *Client) DoAll(bucket string, patch MetadataPatchRequest) error {
+	toSave := map[string]interface{}{}
+	// not to block goroutines, assume at most one error per operation
+	errs := make(chan error, len(patch))
+
+	wg := sync.WaitGroup{}
+	for _, op := range patch {
+		switch op.Type {
+		case OperationTypeSave:
+			toSave[op.Key] = op.Value
+		case OperationTypeDelete:
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, err := cl.Delete(bucket, op.Key)
+				if err != nil {
+					errs <- fmt.Errorf("Delete %s: %v", op.Key, err)
+				}
+			}()
+		}
+	}
+
+	if len(toSave) > 0 {
+		_, err := cl.SaveAll(bucket, toSave)
+		if err != nil {
+			errs <- fmt.Errorf("Save keys %v: %v", mapKeys(toSave), err)
+		}
+	}
+
+	wg.Wait()
+	close(errs)
+
+	errCount := len(errs)
+	if errCount > 0 {
+		errMsgs := make([]string, 0, errCount)
+		for err := range errs {
+			errMsgs = append(errMsgs, err.Error())
+		}
+
+		return fmt.Errorf("Error(s) in metadata patch in bucket %s: %s", bucket, strings.Join(errMsgs, "; "))
+	}
+
+	return nil
+}
+
 func (cl *Client) Delete(bucket, key string) (bool, error) {
 	_, err := cl.http.Delete().
 		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).Send()
 
 	if err != nil {
-		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == 404 {
+		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == http.StatusNotFound {
 			return false, nil
 		}
 		return false, err
 	}
 
 	return true, nil
+}
+
+func (cl *Client) ListAllConflicts(bucket string) ([]*MetadataConflict, error) {
+	res, err := cl.http.Get().
+		AddPath(fmt.Sprintf(conflictsPath, bucket)).
+		Send()
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetadataConflictListResponse
+	if err := res.JSON(&response); err != nil {
+		return nil, fmt.Errorf("Error unmarshaling metadata conflicts: %v", err)
+	}
+
+	return response.Data, nil
+}
+
+func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request) (*gentleman.Response, error) {
+	if cl.conflictResolver == nil {
+		return req.Send()
+	}
+	req.SetHeader(detectConflictsHeader, "true")
+
+	for {
+		res, err := req.Send()
+
+		if isConflict(err) {
+			resolved, resolveErr := cl.conflictResolver.Resolve(cl, bucket)
+			if resolveErr != nil {
+				return nil, fmt.Errorf("Error resolving conflicts: %v", err)
+			} else if !resolved {
+				return nil, fmt.Errorf("Failed to resolve metadata conflicts found in bucket %s", bucket)
+			}
+
+			// Retry the request after conflicts resolved
+			req = req.Clone()
+			continue
+		}
+
+		return res, err
+	}
+}
+
+func isConflict(err error) bool {
+	if respErr, ok := err.(clients.ResponseError); ok && respErr.StatusCode != http.StatusConflict {
+		return true
+	}
+	return false
+}
+
+func mapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
