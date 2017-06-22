@@ -30,7 +30,7 @@ type Metadata interface {
 	Get(bucket, key string, data interface{}) (string, error)
 	Save(bucket, key string, data interface{}) (string, error)
 	SaveAll(bucket string, data map[string]interface{}) (string, error)
-	DoAll(bucket string, path MetadataPatchRequest) error
+	DoAll(bucket string, patch MetadataPatchRequest) error
 	Delete(bucket, key string) (bool, error)
 	ListAllConflicts(bucket string) ([]*MetadataConflict, error)
 }
