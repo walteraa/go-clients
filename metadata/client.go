@@ -268,7 +268,7 @@ func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request)
 			if resolveErr != nil {
 				return nil, fmt.Errorf("Error resolving conflicts: %v", err)
 			} else if !resolved {
-				return nil, fmt.Errorf("Failed to resolve metadata conflicts found in bucket %s", bucket)
+				return nil, err
 			}
 
 			// Retry the request after conflicts resolved
