@@ -33,6 +33,7 @@ type Metadata interface {
 	DoAll(bucket string, patch MetadataPatchRequest) error
 	Delete(bucket, key string) (bool, error)
 	ListAllConflicts(bucket string) ([]*MetadataConflict, error)
+	ResolveConflicts(bucket string, patch MetadataPatchRequest) error
 }
 
 type ConflictResolver interface {
@@ -187,9 +188,9 @@ func (cl *Client) DoAll(bucket string, patch MetadataPatchRequest) error {
 	wg := sync.WaitGroup{}
 	for _, op := range patch {
 		switch op.Type {
-		case OperationTypeSave:
+		case OperationTypeAdd, OperationTypeReplace:
 			toSave[op.Key] = op.Value
-		case OperationTypeDelete:
+		case OperationTypeRemove:
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -252,6 +253,14 @@ func (cl *Client) ListAllConflicts(bucket string) ([]*MetadataConflict, error) {
 	}
 
 	return response.Data, nil
+}
+
+func (cl *Client) ResolveConflicts(bucket string, patch MetadataPatchRequest) error {
+	_, err := cl.http.Post().
+		AddPath(fmt.Sprintf(conflictsPath, bucket)).
+		JSON(patch).
+		Send()
+	return err
 }
 
 func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request) (*gentleman.Response, error) {

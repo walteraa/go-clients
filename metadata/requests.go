@@ -2,16 +2,16 @@ package metadata
 
 type MetadataPatchRequest []*PatchOperation
 
-type OperationType int
+type PatchOperation struct {
+	Type  OperationType `json:"op"`
+	Key   string        `json:"path"`
+	Value interface{}   `json:"value,omitempty"`
+}
+
+type OperationType string
 
 const (
-	_ OperationType = iota
-	OperationTypeSave
-	OperationTypeDelete
+	OperationTypeAdd     = OperationType("add")
+	OperationTypeReplace = OperationType("replace")
+	OperationTypeRemove  = OperationType("remove")
 )
-
-type PatchOperation struct {
-	Type  OperationType
-	Key   string
-	Value interface{}
-}
