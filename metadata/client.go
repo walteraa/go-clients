@@ -273,7 +273,8 @@ func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request)
 	req.SetHeader(detectConflictsHeader, "true")
 
 	for {
-		res, err := req.Send()
+		// Clone request before sending or we won't be able to retry.
+		res, err := req.Clone().Send()
 
 		if isConflict(err) {
 			resolved, resolveErr := cl.conflictResolver.Resolve(cl, bucket)
@@ -284,7 +285,6 @@ func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request)
 			}
 
 			// Retry the request after conflicts resolved
-			req = req.Clone()
 			continue
 		}
 
