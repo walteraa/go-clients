@@ -281,7 +281,7 @@ func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request)
 }
 
 func isConflict(err error) bool {
-	if respErr, ok := err.(clients.ResponseError); ok && respErr.StatusCode != http.StatusConflict {
+	if respErr, ok := err.(clients.ResponseError); ok && respErr.StatusCode == http.StatusConflict {
 		return true
 	}
 	return false
