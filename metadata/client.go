@@ -157,9 +157,10 @@ func (cl *Client) Get(bucket, key string, data interface{}) (string, error) {
 }
 
 func (cl *Client) Save(bucket, key string, data interface{}) (string, error) {
-	res, err := cl.http.Put().
+	req := cl.http.Put().
 		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).
-		JSON(data).Send()
+		JSON(data)
+	res, err := cl.performConflictResolved(bucket, req)
 
 	if err != nil {
 		return "", err
@@ -169,15 +170,31 @@ func (cl *Client) Save(bucket, key string, data interface{}) (string, error) {
 }
 
 func (cl *Client) SaveAll(bucket string, data map[string]interface{}) (string, error) {
-	res, err := cl.http.Put().
+	req := cl.http.Put().
 		AddPath(fmt.Sprintf(metadataPath, bucket)).
-		JSON(data).Send()
+		JSON(data)
+	res, err := cl.performConflictResolved(bucket, req)
 
 	if err != nil {
 		return "", err
 	}
 
 	return res.Header.Get("ETag"), nil
+}
+
+func (cl *Client) Delete(bucket, key string) (bool, error) {
+	req := cl.http.Delete().
+		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key))
+	_, err := cl.performConflictResolved(bucket, req)
+
+	if err != nil {
+		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (cl *Client) DoAll(bucket string, patch MetadataPatchRequest) error {
@@ -225,20 +242,6 @@ func (cl *Client) DoAll(bucket string, patch MetadataPatchRequest) error {
 	return nil
 }
 
-func (cl *Client) Delete(bucket, key string) (bool, error) {
-	_, err := cl.http.Delete().
-		AddPath(fmt.Sprintf(metadataKeyPath, bucket, key)).Send()
-
-	if err != nil {
-		if err, ok := err.(clients.ResponseError); ok && err.StatusCode == http.StatusNotFound {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
-}
-
 func (cl *Client) ListAllConflicts(bucket string) ([]*MetadataConflict, error) {
 	res, err := cl.http.Get().
 		AddPath(fmt.Sprintf(conflictsPath, bucket)).
@@ -275,7 +278,7 @@ func (cl *Client) performConflictResolved(bucket string, req *gentleman.Request)
 		if isConflict(err) {
 			resolved, resolveErr := cl.conflictResolver.Resolve(cl, bucket)
 			if resolveErr != nil {
-				return nil, fmt.Errorf("Error resolving conflicts: %v", err)
+				return nil, fmt.Errorf("Error resolving conflicts: %v", resolveErr)
 			} else if !resolved {
 				return nil, err
 			}
