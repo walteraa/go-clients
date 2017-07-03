@@ -22,12 +22,13 @@ type MetadataConflictListResponse struct {
 }
 
 type MetadataConflict struct {
-	Key    string                  `json:"key"`
-	Values *MetadataConflictValues `json:"values"`
+	Key    string                 `json:"key"`
+	Master *MetadataConflictEntry `json:"master"`
+	Base   *MetadataConflictEntry `json:"base"`
+	Mine   *MetadataConflictEntry `json:"mine"`
 }
 
-type MetadataConflictValues struct {
-	Master json.RawMessage `json:"master"`
-	Base   json.RawMessage `json:"base"`
-	Mine   json.RawMessage `json:"mine"`
+type MetadataConflictEntry struct {
+	Value   json.RawMessage `json:"value"`
+	Deleted bool            `json:"deleted"`
 }
