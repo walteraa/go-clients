@@ -80,7 +80,7 @@ func CreateClient(service string, config *Config, workspaceBound bool) *gentlema
 
 func responseErrors() plugin.Plugin {
 	return plugin.NewResponsePlugin(func(c *context.Context, h context.Handler) {
-		if 200 <= c.Response.StatusCode && c.Response.StatusCode < 400 {
+		if http.StatusOK <= c.Response.StatusCode && c.Response.StatusCode < http.StatusNotFound {
 			h.Next(c)
 			return
 		}
